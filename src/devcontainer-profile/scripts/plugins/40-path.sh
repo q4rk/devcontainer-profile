@@ -9,10 +9,10 @@ path_reconciliation() {
     local bins_to_persist=()
 
     # Scan for dynamic OCI Feature paths (e.g. /usr/local/hugo/bin)
-    # We only accept directories that actually exist.
+    # Limited depth to avoid slowness on large images
     while IFS= read -r dir; do
         bins_to_persist+=("$dir")
-    done < <(find /usr/local /opt "${HOME}" -maxdepth 6 -type d -name bin 2>/dev/null | grep -vE "^/usr/local/bin$|^/usr/bin$|^/bin$")
+    done < <(find /usr/local /opt -maxdepth 3 -type d -name bin 2>/dev/null | grep -vE "^/usr/local/bin$|^/usr/bin$|^/bin$")
 
     # Hardcoded Critical Paths (Pip, Games, Rust, Go)
     local critical_paths=(
@@ -24,6 +24,9 @@ path_reconciliation() {
         "/usr/local/cargo/bin"     # Feature: Rust standard path
         "/usr/local/rustup/bin"    # Rustup path
         "/usr/lib/go/bin"          # Alternate Go path
+        "/usr/local/python/bin"    # Python path
+        "/usr/local/py-utils/bin"  # Python utils path
+        "/usr/local/share/nvm/current/bin" # Node path
         "/home/linuxbrew/.linuxbrew/bin" # Linuxbrew
     )
 

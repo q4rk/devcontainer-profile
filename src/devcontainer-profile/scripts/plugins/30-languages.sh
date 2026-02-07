@@ -53,60 +53,53 @@ discover_binary() {
         return 0 
     fi
 
-    # 2. Check common locations (fast)
-    local common_paths=(
-        "${HOME}/.local/bin"
-        "${HOME}/go/bin"
+    # 2. Check Priority Locations
+    local priority_paths=(
         "${HOME}/.cargo/bin"
+        "${HOME}/go/bin"
+        "${HOME}/.local/bin"
+        "/usr/local/cargo/bin"
+        "/usr/local/rustup/bin"
+        "/usr/local/go/bin"
         "/usr/local/bin"
         "/usr/bin"
         "/bin"
-        "/usr/local/go/bin"
-        "/usr/local/cargo/bin"
-        "/usr/local/rustup/bin"
-        "/usr/lib/go/bin"
         "/usr/games"
         "/home/linuxbrew/.linuxbrew/bin"
         "/opt/homebrew/bin"
-        "/usr/local/rust/current/bin"
-        "/opt/rust/bin"
     )
-    for p in "${common_paths[@]}"; do
+    for p in "${priority_paths[@]}"; do
         if [[ -x "$p/$cmd" ]]; then
-            info "  [Discovery] Found '$cmd' in $p"
-            export PATH="$p:$PATH"
             DISCOVERED_BIN="$p/$cmd"
+            export PATH="$p:$PATH"
             return 0
         fi
     done
 
-    # 3. Rust-specific fallback
+    # 3. Special Fallback for Rustup
     if [[ "$cmd" == "cargo" ]]; then
-        if command -v rustup >/dev/null 2>&1; then
+        local r_bin=""
+        if command -v rustup >/dev/null 2>&1; then r_bin="rustup";
+        elif [[ -x "/usr/local/rustup/bin/rustup" ]]; then r_bin="/usr/local/rustup/bin/rustup";
+        elif [[ -x "/usr/local/cargo/bin/rustup" ]]; then r_bin="/usr/local/cargo/bin/rustup"; fi
+        
+        if [[ -n "$r_bin" ]]; then
             local r_cargo
-            r_cargo=$(rustup which cargo 2>/dev/null || true)
+            r_cargo=$($r_bin which cargo 2>/dev/null || true)
             if [[ -n "$r_cargo" ]] && [[ -x "$r_cargo" ]]; then
-                info "  [Discovery] Found 'cargo' via rustup: $r_cargo"
                 DISCOVERED_BIN="$r_cargo"
-                local r_dir
-                r_dir=$(dirname "$r_cargo")
-                export PATH="$r_dir:$PATH"
+                export PATH="$(dirname "$r_cargo"):$PATH"
                 return 0
             fi
         fi
     fi
 
-    # 4. Deep search (slow)
-    info "  [Discovery] Searching for '$cmd' in /usr/local, /opt, /usr/lib, and ${HOME}..."
+    # 4. Deep search (slow, but limited depth)
     local found
-    # We use a subshell and temporary file to avoid pipe issues and capture the result reliably
-    found=$( (find -L /usr/local /opt /usr/lib "${HOME}" -maxdepth 6 -name "$cmd" -executable 2>/dev/null || true) | head -n 1)
+    found=$( (find -L /usr/local /opt "${HOME}" -maxdepth 4 -name "$cmd" -executable 2>/dev/null || true) | head -n 1)
     if [[ -n "$found" ]]; then
-        info "  [Discovery] Deep search found '$cmd' at $found"
-        local dir
-        dir=$(dirname "$found")
-        export PATH="$dir:$PATH"
         DISCOVERED_BIN="$found"
+        export PATH="$(dirname "$found"):$PATH"
         return 0
     fi
 
@@ -114,41 +107,33 @@ discover_binary() {
 }
 
 languages() {
-    if [[ -z "${USER_CONFIG_PATH-}" ]]; then
-        warn "[Languages] USER_CONFIG_PATH not set. Skipping."
-        return
-    fi
-    if [[ ! -f "${USER_CONFIG_PATH}" ]]; then
-        warn "[Languages] Config file not found: ${USER_CONFIG_PATH}. Skipping."
-        return
-    fi
+    if [[ ! -f "${USER_CONFIG_PATH}" ]]; then return; fi
 
-    info "[Languages] Starting (PATH: $PATH)"
+    # Ensure we have a working PATH initially
+    reload_path || true
 
     export PIP_DISABLE_PIP_VERSION_CHECK=1
     resolve_configuration "pip" "pip"
 
     if [[ -n "$RESOLVED_PKGS" ]]; then
-        # Use simple splitting for the binary in case it is "python -m pip"
         local bin_parts
         IFS=' ' read -r -a bin_parts <<< "$RESOLVED_BIN"
         local base_cmd="${bin_parts[0]}"
         
         if discover_binary "$base_cmd"; then
-            local pip_cmd="$DISCOVERED_BIN"
-            # If it was "python3 -m pip", we need to reconstruct it
+            local pip_exec="$DISCOVERED_BIN"
             if [[ ${#bin_parts[@]} -gt 1 ]]; then
-                pip_cmd="$DISCOVERED_BIN ${bin_parts[@]:1}"
+                pip_exec="$DISCOVERED_BIN ${bin_parts[@]:1}"
             fi
-            info "[Pip] Installing using '$pip_cmd'..."
+            
+            info "[Pip] Installing using '$pip_exec'..."
             local pip_args=("install" "--user" "--upgrade")
-            # Check for modern flag support
-            if $pip_cmd install --help 2>&1 | grep -q "break-system-packages"; then
+            if $pip_exec install --help 2>&1 | grep -q "break-system-packages"; then
                 pip_args+=("--break-system-packages")
             fi
             local pkg_array=()
             while IFS= read -r line; do [[ -n "$line" ]] && pkg_array+=("$line"); done <<< "$RESOLVED_PKGS"
-            $pip_cmd "${pip_args[@]}" "${pkg_array[@]}" >>"${LOG_FILE}" 2>&1 || warn "[Pip] Failed"
+            $pip_exec "${pip_args[@]}" "${pkg_array[@]}" >>"${LOG_FILE}" 2>&1 || warn "[Pip] Failed"
         else
             warn "[Pip] Skipped. '$base_cmd' not found."
         fi
@@ -160,10 +145,9 @@ languages() {
         base_cmd=$(echo "$RESOLVED_BIN" | awk '{print $1}')
         if discover_binary "$base_cmd"; then
             info "[Npm] Installing using '$DISCOVERED_BIN'..."
-            local npm_args=("install" "-g")
             local pkg_array=()
             while IFS= read -r line; do [[ -n "$line" ]] && pkg_array+=("$line"); done <<< "$RESOLVED_PKGS"
-            $DISCOVERED_BIN "${npm_args[@]}" "${pkg_array[@]}" >>"${LOG_FILE}" 2>&1 || warn "[Npm] Failed"
+            $DISCOVERED_BIN install -g "${pkg_array[@]}" >>"${LOG_FILE}" 2>&1 || warn "[Npm] Failed"
         else
             warn "[Npm] Skipped. '$base_cmd' not found."
         fi
@@ -195,31 +179,32 @@ languages() {
 
         if discover_binary "$base_cmd"; then
             local cargo_bin="$DISCOVERED_BIN"
-            # self-healing rust: check if cargo actually works
+            
+            # Self-healing toolchain
             if ! "$cargo_bin" --version >/dev/null 2>&1; then
-                if command -v rustup >/dev/null 2>&1; then
-                    info "[Cargo] Toolchain found but inactive. Initializing..."
-                    rustup default stable >>"${LOG_FILE}" 2>&1 || true
+                local r_bin=""
+                if command -v rustup >/dev/null 2>&1; then r_bin="rustup"
+                else r_bin="$(dirname "$cargo_bin")/rustup"; fi
+                
+                if [[ -x "$r_bin" ]]; then
+                    info "[Cargo] Toolchain found but inactive. Initializing via rustup..."
+                    $r_bin default stable >>"${LOG_FILE}" 2>&1 || true
                 fi
             fi
             
-            # Ensure the target directory exists and is owned by the user
             local cargo_home="${HOME}/.cargo"
             mkdir -p "${cargo_home}/bin"
             
-            info "[Cargo] Installing packages..."
-            local cargo_args=("install" "--root" "${cargo_home}")
+            info "[Cargo] Installing packages using '$cargo_bin'..."
             local pkg_array=()
             while IFS= read -r line; do [[ -n "$line" ]] && pkg_array+=("$line"); done <<< "$RESOLVED_PKGS"
             
-            if "$cargo_bin" "${cargo_args[@]}" "${pkg_array[@]}" >>"${LOG_FILE}" 2>&1; then
-                info "[Cargo] Installation complete."
-            else
-                warn "[Cargo] Some packages failed to install. Last 20 lines of log:"
-                tail -n 20 "${LOG_FILE}" >&2
-            fi
+            # Install packages one by one for better resilience
+            for pkg in "${pkg_array[@]}"; do
+                info "  > Installing: $pkg"
+                "$cargo_bin" install --root "${cargo_home}" "$pkg" >>"${LOG_FILE}" 2>&1 || warn "[Cargo] Failed: $pkg"
+            done
             
-            # Ensure ownership
             if [[ "$(id -u)" -eq 0 ]]; then
                 chown -R "${USER}:${USER}" "${cargo_home}" || true
             fi
@@ -234,18 +219,19 @@ languages() {
         base_cmd=$(echo "$RESOLVED_BIN" | awk '{print $1}')
         if discover_binary "$base_cmd"; then
             local gem_bin="$DISCOVERED_BIN"
-            info "[Gem] Installing packages..."
+            info "[Gem] Installing packages using '$gem_bin'..."
             local pkg_array=()
             while IFS= read -r line; do [[ -n "$line" ]] && pkg_array+=("$line"); done <<< "$RESOLVED_PKGS"
-            # Gems often need sudo if not using RVM/rbenv
-            local gem_args=("install" "--no-document")
             for pkg in "${pkg_array[@]}"; do
-                "$gem_bin" "${gem_args[@]}" "$pkg" >>"${LOG_FILE}" 2>&1 || ensure_root "$gem_bin" "${gem_args[@]}" "$pkg" >>"${LOG_FILE}" 2>&1 || warn "[Gem] Failed: $pkg"
+                "$gem_bin" install --no-document "$pkg" >>"${LOG_FILE}" 2>&1 || ensure_root "$gem_bin" install --no-document "$pkg" >>"${LOG_FILE}" 2>&1 || warn "[Gem] Failed: $pkg"
             done
         else
-            warn "[Gem] Skipped. '$RESOLVED_BIN' not found."
+            warn "[Gem] Skipped. '$base_cmd' not found."
         fi
     fi
+
+    # ... (lolcat fix remains) ...
+
 
     # Fix for lolcat LoadError (Ruby version mismatch)
     if command -v lolcat >/dev/null 2>&1; then
