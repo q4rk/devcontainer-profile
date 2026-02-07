@@ -32,8 +32,9 @@ ensure_root() {
         "$@"
     else
         if command -v sudo >/dev/null 2>&1; then
-            # Use -E to preserve the environment (including TARGET_HOME)
-            sudo -n -E "$@"
+            # Use -H to set HOME to /root, satisfying rustup/installers
+            # and -E to preserve the environment (including TARGET_HOME)
+            sudo -n -E -H "$@"
         else
             "$@"
         fi
