@@ -1,0 +1,43 @@
+{
+    "install_default": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "features": { "devcontainer-profile": {} }
+    },
+    "complex_configs": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "features": { "devcontainer-profile": {} }
+    },
+    "shell_persistence": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "features": { "devcontainer-profile": {} }
+    },
+    "broken_config": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "features": { "devcontainer-profile": {} }
+    },
+    "root_user": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "containerUser": "root",
+        "features": { "devcontainer-profile": {} }
+    },
+    "config_discovery": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "features": { "devcontainer-profile": {} }
+    },
+    "concurrency_lock": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "features": { "devcontainer-profile": {} }
+    },
+    "file_conflicts": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "features": { "devcontainer-profile": {} }
+    },
+    "special_chars": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "features": { "devcontainer-profile": {} }
+    },
+    "challenging_config": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "features": { "devcontainer-profile": {} }
+    }
+}
