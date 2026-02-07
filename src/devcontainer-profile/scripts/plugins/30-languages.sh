@@ -48,8 +48,8 @@ discover_binary() {
     DISCOVERED_BIN=""
     
     # 1. Check if already in PATH
-    if command -v "$cmd" >/dev/null 2>&1; then 
-        DISCOVERED_BIN=$(command -v "$cmd")
+    DISCOVERED_BIN=$(type -P "$cmd" 2>/dev/null || true)
+    if [[ -n "$DISCOVERED_BIN" ]]; then
         return 0 
     fi
 
@@ -68,6 +68,8 @@ discover_binary() {
         "/usr/games"
         "/home/linuxbrew/.linuxbrew/bin"
         "/opt/homebrew/bin"
+        "/usr/local/rust/current/bin"
+        "/opt/rust/bin"
     )
     for p in "${common_paths[@]}"; do
         if [[ -x "$p/$cmd" ]]; then
@@ -78,7 +80,23 @@ discover_binary() {
         fi
     done
 
-    # 3. Deep search (slow)
+    # 3. Rust-specific fallback
+    if [[ "$cmd" == "cargo" ]]; then
+        if command -v rustup >/dev/null 2>&1; then
+            local r_cargo
+            r_cargo=$(rustup which cargo 2>/dev/null || true)
+            if [[ -n "$r_cargo" ]] && [[ -x "$r_cargo" ]]; then
+                info "  [Discovery] Found 'cargo' via rustup: $r_cargo"
+                DISCOVERED_BIN="$r_cargo"
+                local r_dir
+                r_dir=$(dirname "$r_cargo")
+                export PATH="$r_dir:$PATH"
+                return 0
+            fi
+        fi
+    fi
+
+    # 4. Deep search (slow)
     info "  [Discovery] Searching for '$cmd' in /usr/local, /opt, /usr/lib, and ${HOME}..."
     local found
     # We use a subshell and temporary file to avoid pipe issues and capture the result reliably
@@ -104,6 +122,8 @@ languages() {
         warn "[Languages] Config file not found: ${USER_CONFIG_PATH}. Skipping."
         return
     fi
+
+    info "[Languages] Starting (PATH: $PATH)"
 
     export PIP_DISABLE_PIP_VERSION_CHECK=1
     resolve_configuration "pip" "pip"
