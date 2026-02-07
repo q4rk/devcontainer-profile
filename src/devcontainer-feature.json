@@ -1,0 +1,15 @@
+{
+  "description": "Late-binds personal settings from ~/.devcontainer-profile",
+  "id": "devcontainer-profile",
+  "installsAfter": ["ghcr.io/devcontainers/features/common-utils"],
+  "mounts": [
+    {
+      "source": "${devcontainerId}-devcontainer-profile-state",
+      "target": "/var/tmp/devcontainer-profile",
+      "type": "volume"
+    }
+  ],
+  "name": "Dev Container Personal Profile (.devcontainer-profile)",
+  "onCreateCommand": "/usr/local/share/devcontainer-profile/scripts/apply.sh",
+  "version": "0.1.0"
+}
