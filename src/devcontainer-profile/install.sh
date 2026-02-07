@@ -10,15 +10,15 @@ echo ">>> [$name] Installing build-time components..."
 check_cmd() { command -v "$1" >/dev/null 2>&1; }
 
 # Install dependencies if missing
-if ! check_cmd jq || ! check_cmd curl || ! check_cmd sudo; then
-    echo ">>> [$name] Installing missing dependencies (jq, curl, sudo)..."
+if ! check_cmd jq || ! check_cmd curl || ! check_cmd sudo || ! check_cmd unzip || ! check_cmd gpg; then
+    echo ">>> [$name] Installing missing dependencies (jq, curl, sudo, unzip, gpg)..."
     export DEBIAN_FRONTEND=noninteractive
     # We allow update to fail because some base images have broken third-party repos (like Yarn)
     # that we don't depend on. We use '|| true' to be absolutely sure it doesn't trigger errexit.
     apt-get update -y || true
     
     # Try to install, but don't fail the whole build if it fails (late-binding philosophy)
-    apt-get install -y jq curl ca-certificates sudo || echo "(!) Warning: Dependency installation failed."
+    apt-get install -y jq curl ca-certificates sudo unzip gnupg || echo "(!) Warning: Dependency installation failed."
 fi
 
 echo ">>> [$name] Installing feature-installer..."

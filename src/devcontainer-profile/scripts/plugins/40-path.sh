@@ -12,7 +12,7 @@ path_reconciliation() {
     # We only accept directories that actually exist.
     while IFS= read -r dir; do
         bins_to_persist+=("$dir")
-    done < <(find /usr/local -maxdepth 3 -type d -name bin 2>/dev/null | grep -v "^/usr/local/bin$")
+    done < <(find /usr/local /opt "${HOME}" -maxdepth 4 -type d -name bin 2>/dev/null | grep -vE "^/usr/local/bin$|^/usr/bin$|^/bin$")
 
     # Hardcoded Critical Paths (Pip, Games, Rust, Go)
     local critical_paths=(
@@ -22,6 +22,9 @@ path_reconciliation() {
         "${HOME}/.cargo/bin"       # cargo install
         "/usr/local/go/bin"        # Feature: Go standard path
         "/usr/local/cargo/bin"     # Feature: Rust standard path
+        "/usr/local/rustup/bin"    # Rustup path
+        "/usr/lib/go/bin"          # Alternate Go path
+        "/home/linuxbrew/.linuxbrew/bin" # Linuxbrew
     )
 
     for p in "${critical_paths[@]}"; do

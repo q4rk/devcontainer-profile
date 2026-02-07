@@ -50,6 +50,8 @@ discover_binary() {
         "/usr/local/rustup/bin"
         "/usr/lib/go/bin"
         "/usr/games"
+        "/home/linuxbrew/.linuxbrew/bin"
+        "/opt/homebrew/bin"
     )
     for p in "${common_paths[@]}"; do
         if [[ -x "$p/$cmd" ]]; then
@@ -58,10 +60,10 @@ discover_binary() {
         fi
     done
 
-    # Last resort: search /usr/local and /opt (slow)
-    info "[Discovery] Searching for '$cmd' in /usr/local and /opt..."
+    # Last resort: search /usr/local, /opt, and /usr/lib (slow)
+    info "[Discovery] Searching for '$cmd' in /usr/local, /opt, and /usr/lib..."
     local found
-    found=$(find /usr/local /opt -maxdepth 4 -type f -name "$cmd" -executable 2>/dev/null | head -n 1)
+    found=$(find /usr/local /opt /usr/lib -maxdepth 5 -type f -name "$cmd" -executable 2>/dev/null | head -n 1)
     if [[ -n "$found" ]]; then
         local dir
         dir=$(dirname "$found")
@@ -99,8 +101,8 @@ languages() {
 
     resolve_configuration "npm" "npm"
     if [[ -n "$RESOLVED_PKGS" ]]; then
-        base_cmd=$(echo "$RESOLVED_BIN" | awk '{print $1}')
         local base_cmd
+        base_cmd=$(echo "$RESOLVED_BIN" | awk '{print $1}')
         if command -v "$base_cmd" >/dev/null 2>&1; then
             info "[Npm] Installing using '$RESOLVED_BIN'..."
             local npm_args=("install" "-g")
@@ -114,8 +116,8 @@ languages() {
 
     resolve_configuration "go" "go"
     if [[ -n "$RESOLVED_PKGS" ]]; then
-        base_cmd=$(echo "$RESOLVED_BIN" | awk '{print $1}')
         local base_cmd
+        base_cmd=$(echo "$RESOLVED_BIN" | awk '{print $1}')
         
         if discover_binary "$base_cmd"; then
             info "[Go] Installing using '$RESOLVED_BIN'..."
@@ -133,8 +135,8 @@ languages() {
 
     resolve_configuration "cargo" "cargo"
     if [[ -n "$RESOLVED_PKGS" ]]; then
-        base_cmd=$(echo "$RESOLVED_BIN" | awk '{print $1}')
         local base_cmd
+        base_cmd=$(echo "$RESOLVED_BIN" | awk '{print $1}')
 
         if discover_binary "$base_cmd"; then
             # self-healing rust: check if cargo actually works
@@ -167,6 +169,32 @@ languages() {
             fi
         else
             warn "[Cargo] Skipped. '$base_cmd' not found."
+        fi
+    fi
+
+    resolve_configuration "gem" "gem"
+    if [[ -n "$RESOLVED_PKGS" ]]; then
+        if discover_binary "$RESOLVED_BIN"; then
+            info "[Gem] Installing packages..."
+            local pkg_array=()
+            while IFS= read -r line; do [[ -n "$line" ]] && pkg_array+=("$line"); done <<< "$RESOLVED_PKGS"
+            # Gems often need sudo if not using RVM/rbenv
+            local gem_cmd="$RESOLVED_BIN install --no-document"
+            for pkg in "${pkg_array[@]}"; do
+                $gem_cmd "$pkg" >>"${LOG_FILE}" 2>&1 || ensure_root $gem_cmd "$pkg" >>"${LOG_FILE}" 2>&1 || warn "[Gem] Failed: $pkg"
+            done
+        else
+            warn "[Gem] Skipped. '$RESOLVED_BIN' not found."
+        fi
+    fi
+
+    # Fix for lolcat LoadError (Ruby version mismatch)
+    if command -v lolcat >/dev/null 2>&1; then
+        if ! lolcat --version >/dev/null 2>&1; then
+            info "[Fix] lolcat appears broken. Attempting to fix via gem..."
+            if command -v gem >/dev/null 2>&1; then
+                gem install lolcat >>"${LOG_FILE}" 2>&1 || ensure_root gem install lolcat >>"${LOG_FILE}" 2>&1
+            fi
         fi
     fi
 }
