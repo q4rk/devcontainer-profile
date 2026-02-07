@@ -14,8 +14,8 @@ if ! check_cmd jq || ! check_cmd curl || ! check_cmd sudo; then
     echo ">>> [$name] Installing missing dependencies (jq, curl, sudo)..."
     export DEBIAN_FRONTEND=noninteractive
     # We allow update to fail because some base images have broken third-party repos (like Yarn)
-    # that we don't depend on.
-    apt-get update -y || echo "(!) Warning: apt-get update encountered errors. Attempting to proceed..."
+    # that we don't depend on. We use '|| true' to be absolutely sure it doesn't trigger errexit.
+    apt-get update -y || true
     
     # Try to install, but don't fail the whole build if it fails (late-binding philosophy)
     apt-get install -y jq curl ca-certificates sudo || echo "(!) Warning: Dependency installation failed."

@@ -21,9 +21,9 @@ apt() {
     info "[APT] Installing: ${packages[*]}"
     local retries=3
     local count=0
-    until DEBIAN_FRONTEND=noninteractive ensure_root apt-get update -q; do
+    until DEBIAN_FRONTEND=noninteractive ensure_root apt-get update -q || true; do
         count=$((count + 1))
-        [[ $count -lt $retries ]] || { error "[APT] Update failed."; return 1; }
+        [[ $count -lt $retries ]] || { warn "[APT] Update encountered persistent errors. Attempting install anyway."; break; }
         sleep 2
     done
     if ! DEBIAN_FRONTEND=noninteractive ensure_root apt-get install -y --no-install-recommends "${packages[@]}" >>"${LOG_FILE}" 2>&1; then

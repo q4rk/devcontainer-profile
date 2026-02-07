@@ -23,6 +23,7 @@ vscode_extensions() {
     # Get currently installed extensions to skip duplicates
     local installed_exts
     installed_exts=$($code_bin --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]')
+    info "  Currently installed extensions: $(echo "${installed_exts}" | xargs)"
 
     for id in "${ext_ids[@]}"; do
         id_lower=$(echo "$id" | tr '[:upper:]' '[:lower:]')
@@ -32,7 +33,9 @@ vscode_extensions() {
         else
             info "  > Installing: ${id}"
             # Use --force to ensure it doesn't hang on prompts
-            $code_bin --install-extension "${id}" --force >>"${LOG_FILE}" 2>&1 || warn "Failed to install extension: ${id}"
+            if ! $code_bin --install-extension "${id}" --force >>"${LOG_FILE}" 2>&1; then
+                 warn "Failed to install extension: ${id}"
+            fi
         fi
     done
 }

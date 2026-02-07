@@ -50,6 +50,7 @@ mock_tool() {
 #!/bin/bash
 echo "AUDIT: \$0 \$*" >> "$AUDIT_LOG"
 if [[ "\$*" == *"--list-extensions"* ]]; then
+    echo ""
     exit 0
 fi
 EOF
