@@ -4,12 +4,11 @@ set -e
 # Import test library
 source dev-container-features-test-lib
 
-# Setup a complex config
-CONFIG_DIR="$HOME/.devcontainer-profile"
-mkdir -p "$CONFIG_DIR"
-cat << EOF > "$CONFIG_DIR/config.json"
+# Setup a complex config using the discovery file (~/.devcontainer.profile)
+# This ensures it survives the engine's symlink creation.
+cat << EOF > "$HOME/.devcontainer.profile"
 {
-    "apt": ["tree"],
+    "apt": ["sl"],
     "env": {
         "SCENARIO_TEST": "battle-tested"
     },
@@ -25,17 +24,17 @@ EOF
 # Create a source file for the symlink test
 touch "$HOME/test_source"
 
-# Manually trigger apply.sh to process our new config
-# We use sudo because apply.sh might need to run apt-get
-sudo /usr/local/share/devcontainer-profile/scripts/apply.sh
+# Run the engine as the current user. 
+# It will use sudo internally for apt-get.
+/usr/local/share/devcontainer-profile/scripts/apply.sh
 
 # Verifications
-check "apt: tree is installed" command -v tree
+check "apt: sl is installed" command -v sl
 check "env: variable is set" grep "SCENARIO_TEST" "$HOME/.devcontainer.profile_env"
-check "files: symlink created" ls "$HOME/test_target"
-check "scripts: executed" ls "$HOME/script_success"
+check "files: symlink created" [ -L "$HOME/test_target" ]
+check "scripts: executed" [ -f "$HOME/script_success" ]
 
-# Test Idempotency: Run again, should be fast and no errors
-check "idempotency: run again" sudo /usr/local/share/devcontainer-profile/scripts/apply.sh
+# Test Idempotency: Run again
+check "idempotency: run again" /usr/local/share/devcontainer-profile/scripts/apply.sh
 
 reportResults

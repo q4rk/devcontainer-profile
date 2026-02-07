@@ -6,14 +6,14 @@ source dev-container-features-test-lib
 
 # Place config in the discovery path (mimicking a bind mount)
 DISCOVERY_PATH="/var/tmp/devcontainer-profile/.config/.devcontainer-profile"
-mkdir -p "$DISCOVERY_PATH"
-echo '{"env": {"DISCOVERED": "true"}}' > "$DISCOVERY_PATH/config.json"
+sudo mkdir -p "$DISCOVERY_PATH"
+sudo bash -c "echo '{\"env\": {\"DISCOVERED\": \"true\"}}' > '$DISCOVERY_PATH/config.json'"
 
 # Clean the volume to force discovery
-sudo rm -rf /var/tmp/devcontainer-profile/configs/*
+sudo rm -rf /var/tmp/devcontainer-profile/state/configs/*
 
 # Trigger apply
-sudo /usr/local/share/devcontainer-profile/scripts/apply.sh
+/usr/local/share/devcontainer-profile/scripts/apply.sh
 
 # Verifications
 check "discovery: config ingested" [ -f "$HOME/.devcontainer-profile/config.json" ]

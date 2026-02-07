@@ -5,11 +5,11 @@ set -e
 source dev-container-features-test-lib
 
 # Verify identity
+info "Current user: $(id)"
 check "user: is root" [ "$(id -u)" -eq 0 ]
 
-# Config for root
-mkdir -p "$HOME/.devcontainer-profile"
-echo '{"env": {"ROOT_ACTIVE": "true"}}' > "$HOME/.devcontainer-profile/config.json"
+# Config for root via discovery file
+echo '{"env": {"ROOT_ACTIVE": "true"}}' > "$HOME/.devcontainer.profile"
 
 # Trigger apply
 /usr/local/share/devcontainer-profile/scripts/apply.sh

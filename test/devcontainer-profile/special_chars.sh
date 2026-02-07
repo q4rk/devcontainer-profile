@@ -5,8 +5,7 @@ set -e
 source dev-container-features-test-lib
 
 # Config with complex strings
-mkdir -p "$HOME/.devcontainer-profile"
-cat << EOF > "$HOME/.devcontainer-profile/config.json"
+cat << EOF > "$HOME/.devcontainer.profile"
 {
     "env": {
         "COMPLEX_VAR": "Space and 'quotes' and 🚀 emoji",
@@ -16,12 +15,12 @@ cat << EOF > "$HOME/.devcontainer-profile/config.json"
 EOF
 
 # Trigger apply
-sudo /usr/local/share/devcontainer-profile/scripts/apply.sh
+/usr/local/share/devcontainer-profile/scripts/apply.sh
 
 # Verifications
 check "env: handles spaces and emojis" grep "Space and 'quotes' and 🚀 emoji" "$HOME/.devcontainer.profile_env"
 
-# Verify we can source it without syntax errors
+# Verify we can source it
 # shellcheck source=/dev/null
 source "$HOME/.devcontainer.profile_env"
 check "env: sourced correctly" [ "$COMPLEX_VAR" = "Space and 'quotes' and 🚀 emoji" ]

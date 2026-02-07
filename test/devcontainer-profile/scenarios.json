@@ -15,11 +15,14 @@
         "image": "mcr.microsoft.com/devcontainers/base:debian",
         "features": { "devcontainer-profile": {} }
     },
-    "root_user": {
-        "image": "mcr.microsoft.com/devcontainers/base:debian",
-        "containerUser": "root",
-        "features": { "devcontainer-profile": {} }
-    },
+        "root_user": {
+            "image": "mcr.microsoft.com/devcontainers/base:debian",
+            "remoteUser": "root",
+            "features": {
+                "devcontainer-profile": {}
+            }
+        },
+    
     "config_discovery": {
         "image": "mcr.microsoft.com/devcontainers/base:debian",
         "features": { "devcontainer-profile": {} }

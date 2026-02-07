@@ -18,7 +18,7 @@ mkdir -p "$HOME" "$PLUGIN_DIR" "$MANAGED_CONFIG_DIR"
 touch "$LOG_FILE"
 
 # Copy real plugins from workspace
-REAL_PLUGIN_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/plugins"
+REAL_PLUGIN_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../src/devcontainer-profile" && pwd)/scripts/plugins"
 cp "$REAL_PLUGIN_SRC"/*.sh "$PLUGIN_DIR/"
 
 log() { echo "[$1] $2"; }

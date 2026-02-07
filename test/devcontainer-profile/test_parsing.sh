@@ -17,7 +17,7 @@ export LOG_FILE="$TEST_ROOT/devcontainer-profile.log"
 mkdir -p "$HOME" "$PLUGIN_DIR" "$TEST_ROOT/bin" "$MANAGED_CONFIG_DIR"
 touch "$LOG_FILE" "$AUDIT_LOG"
 
-REAL_PLUGIN_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/scripts/plugins"
+REAL_PLUGIN_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../src/devcontainer-profile" && pwd)/scripts/plugins"
 cp "$REAL_PLUGIN_SRC"/*.sh "$PLUGIN_DIR/"
 
 mock_tool() {
