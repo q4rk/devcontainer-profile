@@ -45,8 +45,15 @@ info "Using plugin source: $REAL_PLUGIN_SRC"
 cp "$REAL_PLUGIN_SRC"/*.sh "$PLUGIN_DIR/"
 
 mock_tool() {
-    echo -e "#!/bin/bash\necho \"AUDIT: \$0 \$*\" >> \"$AUDIT_LOG\"" > "$TEST_ROOT/bin/$1"
-    chmod +x "$TEST_ROOT/bin/$1"
+    local tool="$1"
+    cat << EOF > "$TEST_ROOT/bin/$tool"
+#!/bin/bash
+echo "AUDIT: \$0 \$*" >> "$AUDIT_LOG"
+if [[ "\$*" == *"--list-extensions"* ]]; then
+    exit 0
+fi
+EOF
+    chmod +x "$TEST_ROOT/bin/$tool"
 }
 export PATH="$TEST_ROOT/bin:$PATH"
 

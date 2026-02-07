@@ -66,6 +66,11 @@ ls -la "$HOME/.devcontainer.profile"
 # Trigger apply
 /usr/local/share/devcontainer-profile/scripts/apply.sh
 
+# Re-source the path
+if [ -f "$HOME/.devcontainer.profile_path" ]; then
+    . "$HOME/.devcontainer.profile_path"
+fi
+
 # Engine diagnostics
 ls -la /var/tmp/devcontainer-profile/state/
 cat /var/tmp/devcontainer-profile/state/devcontainer-profile.log

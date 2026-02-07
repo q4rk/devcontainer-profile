@@ -6,14 +6,27 @@ set -o nounset
 readonly name="devcontainer-profile"
 echo ">>> [$name] Installing build-time components..."
 
-apt_get_update() {
-    if [ "$(find /var/lib/apt/lists/* | wc -l)" = "0" ]; then apt-get update -y; fi
-}
-apt_get_update
-apt-get install -y jq curl ca-certificates sudo
+# Helper to check if a command exists
+check_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+# Install dependencies if missing
+if ! check_cmd jq || ! check_cmd curl || ! check_cmd sudo; then
+    echo ">>> [$name] Installing missing dependencies (jq, curl, sudo)..."
+    export DEBIAN_FRONTEND=noninteractive
+    # We allow update to fail because some base images have broken third-party repos (like Yarn)
+    # that we don't depend on.
+    apt-get update -y || echo "(!) Warning: apt-get update encountered errors. Attempting to proceed..."
+    
+    # Try to install, but don't fail the whole build if it fails (late-binding philosophy)
+    apt-get install -y jq curl ca-certificates sudo || echo "(!) Warning: Dependency installation failed."
+fi
 
 echo ">>> [$name] Installing feature-installer..."
-curl -fsSL https://raw.githubusercontent.com/devcontainer-community/feature-installer/main/scripts/install.sh | bash
+# We use -f for curl to fail on server errors, but we wrap in a check
+if ! curl -fsSL https://raw.githubusercontent.com/devcontainer-community/feature-installer/main/scripts/install.sh | bash; then
+    echo "(!) ERROR: Failed to install feature-installer. This is a fatal error."
+    exit 1
+fi
 
 # locate and move binary (Handle root vs non-root paths)
 INSTALLED_BIN=""
@@ -52,8 +65,8 @@ else
 fi
 
 if [ -n "${_REMOTE_USER}" ] && [ "${_REMOTE_USER}" != "root" ]; then
-    chown -R "${_REMOTE_USER}:${_REMOTE_USER}" /var/tmp/devcontainer-profile
-    chown -R "${_REMOTE_USER}:${_REMOTE_USER}" /usr/local/share/devcontainer-profile
+    chown -R "${_REMOTE_USER}:${_REMOTE_USER}" /var/tmp/devcontainer-profile || true
+    chown -R "${_REMOTE_USER}:${_REMOTE_USER}" /usr/local/share/devcontainer-profile || true
 fi
 
 echo ">>> [$name] Installation complete."

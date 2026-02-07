@@ -28,6 +28,11 @@ touch "$HOME/test_source"
 # It will use sudo internally for apt-get.
 /usr/local/share/devcontainer-profile/scripts/apply.sh
 
+# Re-source the path so 'sl' (in /usr/games) is found
+if [ -f "$HOME/.devcontainer.profile_path" ]; then
+    . "$HOME/.devcontainer.profile_path"
+fi
+
 # Verifications
 if command -v sl; then
     check "apt: sl is installed" true
