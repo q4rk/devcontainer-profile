@@ -60,10 +60,10 @@ discover_binary() {
         fi
     done
 
-    # Last resort: search /usr/local, /opt, and /usr/lib (slow)
-    info "[Discovery] Searching for '$cmd' in /usr/local, /opt, and /usr/lib..."
+    # Last resort: search /usr/local, /opt, /usr/lib, and HOME (slow)
+    info "[Discovery] Searching for '$cmd' in /usr/local, /opt, /usr/lib, and ${HOME}..."
     local found
-    found=$(find /usr/local /opt /usr/lib -maxdepth 5 -type f -name "$cmd" -executable 2>/dev/null | head -n 1)
+    found=$(find /usr/local /opt /usr/lib "${HOME}" -maxdepth 6 -type f -name "$cmd" -executable 2>/dev/null | head -n 1)
     if [[ -n "$found" ]]; then
         local dir
         dir=$(dirname "$found")

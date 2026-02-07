@@ -12,7 +12,7 @@ path_reconciliation() {
     # We only accept directories that actually exist.
     while IFS= read -r dir; do
         bins_to_persist+=("$dir")
-    done < <(find /usr/local /opt "${HOME}" -maxdepth 4 -type d -name bin 2>/dev/null | grep -vE "^/usr/local/bin$|^/usr/bin$|^/bin$")
+    done < <(find /usr/local /opt "${HOME}" -maxdepth 6 -type d -name bin 2>/dev/null | grep -vE "^/usr/local/bin$|^/usr/bin$|^/bin$")
 
     # Hardcoded Critical Paths (Pip, Games, Rust, Go)
     local critical_paths=(

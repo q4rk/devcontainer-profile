@@ -80,7 +80,7 @@ reload_path() {
     # Dynamic discovery of other bin dirs (e.g. /usr/local/python/bin, /usr/local/hugo/bin)
     while IFS= read -r dir; do
         critical_paths+=("$dir")
-    done < <(find /usr/local /opt "${TARGET_HOME}" -maxdepth 4 -type d -name bin 2>/dev/null | grep -vE "^/usr/local/bin$|^/usr/bin$|^/bin$")
+    done < <(find /usr/local /opt "${TARGET_HOME}" -maxdepth 6 -type d -name bin 2>/dev/null | grep -vE "^/usr/local/bin$|^/usr/bin$|^/bin$")
 
     for p in "${critical_paths[@]}"; do add_to_path "$p"; done
 }
