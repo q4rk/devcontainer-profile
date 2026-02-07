@@ -8,8 +8,12 @@ resolve_configuration() {
     RESOLVED_BIN=""
     RESOLVED_PKGS=""
 
+    if [[ ! -f "${USER_CONFIG_PATH}" ]]; then
+        return 0
+    fi
+
     local raw_config
-    raw_config=$(jq -c ".\"$key\" // empty" "${USER_CONFIG_PATH}")
+    raw_config=$(jq -c ".\"$key\" // empty" "${USER_CONFIG_PATH}" 2>/dev/null)
     [[ -z "$raw_config" ]] && return 0
 
     local config_type
@@ -32,18 +36,24 @@ resolve_configuration() {
                 empty 
             end')
     fi
+    
+    if [[ -n "$RESOLVED_PKGS" ]]; then
+        info "  [$key] Resolved: bin=$RESOLVED_BIN, pkgs=$(echo "$RESOLVED_PKGS" | wc -l) lines"
+    fi
 }
 
 # Helper to find a binary if not in PATH
 discover_binary() {
     local cmd="$1"
     DISCOVERED_BIN=""
+    
+    # 1. Check if already in PATH
     if command -v "$cmd" >/dev/null 2>&1; then 
         DISCOVERED_BIN=$(command -v "$cmd")
         return 0 
     fi
 
-    # Check common locations first (fast)
+    # 2. Check common locations (fast)
     local common_paths=(
         "${HOME}/.local/bin"
         "${HOME}/go/bin"
@@ -61,18 +71,20 @@ discover_binary() {
     )
     for p in "${common_paths[@]}"; do
         if [[ -x "$p/$cmd" ]]; then
+            info "  [Discovery] Found '$cmd' in $p"
             export PATH="$p:$PATH"
             DISCOVERED_BIN="$p/$cmd"
             return 0
         fi
     done
 
-    # Last resort: search /usr/local, /opt, /usr/lib, and HOME (slow)
-    # We use a subshell to avoid pipefail issues with head -n 1
-    info "[Discovery] Searching for '$cmd' in /usr/local, /opt, /usr/lib, and ${HOME}..."
+    # 3. Deep search (slow)
+    info "  [Discovery] Searching for '$cmd' in /usr/local, /opt, /usr/lib, and ${HOME}..."
     local found
+    # We use a subshell and temporary file to avoid pipe issues and capture the result reliably
     found=$( (find -L /usr/local /opt /usr/lib "${HOME}" -maxdepth 6 -name "$cmd" -executable 2>/dev/null || true) | head -n 1)
     if [[ -n "$found" ]]; then
+        info "  [Discovery] Deep search found '$cmd' at $found"
         local dir
         dir=$(dirname "$found")
         export PATH="$dir:$PATH"
@@ -84,6 +96,15 @@ discover_binary() {
 }
 
 languages() {
+    if [[ -z "${USER_CONFIG_PATH-}" ]]; then
+        warn "[Languages] USER_CONFIG_PATH not set. Skipping."
+        return
+    fi
+    if [[ ! -f "${USER_CONFIG_PATH}" ]]; then
+        warn "[Languages] Config file not found: ${USER_CONFIG_PATH}. Skipping."
+        return
+    fi
+
     export PIP_DISABLE_PIP_VERSION_CHECK=1
     resolve_configuration "pip" "pip"
 

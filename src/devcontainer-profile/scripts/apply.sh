@@ -101,6 +101,8 @@ run_plugins() {
         # Export TARGET variables for plugins
         export HOME="${TARGET_HOME}"
         export USER="${TARGET_USER}"
+        export USER_CONFIG_PATH="${USER_CONFIG_PATH}"
+        export LOG_FILE="${LOG_FILE}"
         
         for script in $(find "$PLUGIN_DIR"/*.sh | sort); do
             if [[ -f "$script" ]]; then
