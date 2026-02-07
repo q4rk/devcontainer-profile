@@ -43,6 +43,18 @@ languages() {
         local bin_parts
         IFS=' ' read -r -a bin_parts <<< "$RESOLVED_BIN"
         local base_cmd="${bin_parts[0]}"
+        
+        # Proactive discovery
+        if ! command -v "$base_cmd" >/dev/null 2>&1; then
+            local pip_paths=("${HOME}/.local/bin" "/usr/local/bin")
+            for p in "${pip_paths[@]}"; do
+                if [[ -d "$p" ]] && [[ -x "$p/$base_cmd" ]]; then
+                    export PATH="$PATH:$p"
+                    break
+                fi
+            done
+        fi
+
         if command -v "$base_cmd" >/dev/null 2>&1; then
             info "[Pip] Installing using '$RESOLVED_BIN'..."
             local pip_args=("install" "--user" "--upgrade")
@@ -77,6 +89,18 @@ languages() {
     if [[ -n "$RESOLVED_PKGS" ]]; then
         base_cmd=$(echo "$RESOLVED_BIN" | awk '{print $1}')
         local base_cmd
+        
+        # Proactive discovery
+        if ! command -v "$base_cmd" >/dev/null 2>&1; then
+            local go_paths=("${HOME}/go/bin" "/usr/local/go/bin" "/usr/lib/go/bin")
+            for p in "${go_paths[@]}"; do
+                if [[ -d "$p" ]] && [[ -x "$p/$base_cmd" ]]; then
+                    export PATH="$PATH:$p"
+                    break
+                fi
+            done
+        fi
+
         if command -v "$base_cmd" >/dev/null 2>&1; then
             info "[Go] Installing using '$RESOLVED_BIN'..."
             local pkg_array=()
@@ -95,6 +119,18 @@ languages() {
     if [[ -n "$RESOLVED_PKGS" ]]; then
         base_cmd=$(echo "$RESOLVED_BIN" | awk '{print $1}')
         local base_cmd
+
+        # Proactive discovery
+        if ! command -v "$base_cmd" >/dev/null 2>&1; then
+            local rust_paths=("${HOME}/.cargo/bin" "/usr/local/cargo/bin" "/usr/local/rustup/bin")
+            for p in "${rust_paths[@]}"; do
+                if [[ -d "$p" ]] && [[ -x "$p/$base_cmd" ]]; then
+                    export PATH="$PATH:$p"
+                    break
+                fi
+            done
+        fi
+
         if command -v "$base_cmd" >/dev/null 2>&1; then
             # self-healing rust: check if cargo actually works
             if ! "$base_cmd" --version >/dev/null 2>&1; then
