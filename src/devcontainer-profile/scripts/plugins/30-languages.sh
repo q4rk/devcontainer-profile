@@ -81,7 +81,8 @@ discover_binary() {
         local r_bin=""
         if command -v rustup >/dev/null 2>&1; then r_bin="rustup";
         elif [[ -x "/usr/local/rustup/bin/rustup" ]]; then r_bin="/usr/local/rustup/bin/rustup";
-        elif [[ -x "/usr/local/cargo/bin/rustup" ]]; then r_bin="/usr/local/cargo/bin/rustup"; fi
+        elif [[ -x "/usr/local/cargo/bin/rustup" ]]; then r_bin="/usr/local/cargo/bin/rustup";
+        elif [[ -x "${HOME}/.cargo/bin/rustup" ]]; then r_bin="${HOME}/.cargo/bin/rustup"; fi
         
         if [[ -n "$r_bin" ]]; then
             local r_cargo

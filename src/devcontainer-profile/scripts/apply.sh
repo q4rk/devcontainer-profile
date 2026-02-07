@@ -214,7 +214,7 @@ main() {
     echo "${current_hash}" > "${STATE_DIR}/last_applied_hash"
     touch "${INSTANCE_MARKER}"
     chown "${TARGET_USER}:${TARGET_USER}" "${STATE_DIR}/last_applied_hash" "${INSTANCE_MARKER}" || true
-    info "=== COMPLETED ==="
+    info "=== COMPLETED (Final PATH: $PATH) ==="
 }
 
 main "$@" || true

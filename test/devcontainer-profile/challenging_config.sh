@@ -53,10 +53,10 @@ cat << EOF > "$HOME/.devcontainer.profile"
     { "id": "ghcr.io/devcontainers/features/terraform:1" }
   ],
   "scripts": [
-    "echo 'alias please=\"sudo\"' >> ~/.bashrc",
-    "echo 'alias ll=\"lsd -la\"' >> ~/.bashrc",
+    "grep -q 'alias please' ~/.bashrc || echo 'alias please=\"sudo\"' >> ~/.bashrc",
+    "grep -q 'alias ll' ~/.bashrc || echo 'alias ll=\"lsd -la\"' >> ~/.bashrc",
     "fortune | cowsay | lolcat > ~/welcome_message.txt",
-    "echo 'cat ~/welcome_message.txt' >> ~/.bashrc"
+    "grep -q 'welcome_message.txt' ~/.bashrc || echo 'cat ~/welcome_message.txt' >> ~/.bashrc"
   ]
 }
 EOF
@@ -85,8 +85,8 @@ check "npm: localtunnel is installed" command -v lt
 check "go: lazygit is installed" command -v lazygit
 if ! command -v lsd >/dev/null 2>&1; then
     echo "(!) ERROR: lsd not found in PATH. Diagnostic Log (/var/tmp/devcontainer-profile/state/devcontainer-profile.log):"
-    echo "--- LAST 100 LINES ---"
-    tail -n 100 /var/tmp/devcontainer-profile/state/devcontainer-profile.log || true
+    echo "--- FULL LOG ---"
+    cat /var/tmp/devcontainer-profile/state/devcontainer-profile.log || true
     echo "--- ALL ERRORS/WARNINGS (Case-Insensitive) ---"
     grep -Ei "error|warn|failed" /var/tmp/devcontainer-profile/state/devcontainer-profile.log || true
 fi

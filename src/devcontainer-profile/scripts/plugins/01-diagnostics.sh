@@ -26,12 +26,30 @@ check_loc "go"
 check_loc "pip"
 check_loc "npm"
 check_loc "gem"
+check_loc "python3"
+check_loc "node"
 
-# Check common Rust locations
-rust_paths=("/usr/local/cargo/bin" "/usr/local/rustup/bin" "/home/codespace/.cargo/bin")
-for p in "${rust_paths[@]}"; do
+# Check common toolchain locations
+probe_paths=(
+    "/usr/local/cargo/bin"
+    "/usr/local/rustup/bin"
+    "/usr/local/go/bin"
+    "/usr/local/bin"
+    "/usr/bin"
+    "/bin"
+    "/usr/local/python/bin"
+    "/usr/local/py-utils/bin"
+    "/usr/local/share/nvm/current/bin"
+    "/home/codespace/.cargo/bin"
+    "/home/codespace/go/bin"
+    "/home/codespace/.local/bin"
+)
+for p in "${probe_paths[@]}"; do
     if [[ -d "$p" ]]; then
-        info "  > Directory exists: $p"
-        ls -F "$p" | head -n 5 | sed 's/^/    - /' >> "${LOG_FILE}"
+        count=$(ls -1 "$p" 2>/dev/null | wc -l)
+        info "  > Directory exists ($count files): $p"
+        if [[ $count -gt 0 ]]; then
+            ls -F "$p" | head -n 3 | sed 's/^/    - /' >> "${LOG_FILE}"
+        fi
     fi
 done

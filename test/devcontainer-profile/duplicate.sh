@@ -18,7 +18,7 @@ cat << EOF > "$HOME/.devcontainer.profile"
   "apt": ["cowsay"],
   "shell-history": true,
   "scripts": [
-    "echo 'alias duplicate_check=\"echo works\"' >> ~/.bashrc"
+    "grep -q 'alias duplicate_check' ~/.bashrc || echo 'alias duplicate_check=\"echo works\"' >> ~/.bashrc"
   ]
 }
 EOF
