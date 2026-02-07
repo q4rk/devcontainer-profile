@@ -7,28 +7,41 @@ files() {
 
     info "[Files] Linking dotfiles..."
     jq -c '.files[]?' "${USER_CONFIG_PATH}" | while read -r item; do
+        [[ -z "$item" || "$item" == "null" ]] && continue
         local src tgt
         src=$(echo "$item" | jq -r '.source')
         tgt=$(echo "$item" | jq -r '.target')
 
+        # Expand ~ manually to avoid eval issues in some contexts
         src="${src/#\~/$HOME}"
         tgt="${tgt/#\~/$HOME}"
-        src=$(eval echo "$src")
-        tgt=$(eval echo "$tgt")
 
         if [[ -e "$src" ]]; then
-            if [[ -d "$tgt" ]] && [[ ! -L "$tgt" ]]; then
-                warn "[Files] Target $tgt is a directory. Backing up..."
-                mv "$tgt" "${tgt}.bak"
-            elif [[ -f "$tgt" ]] && [[ ! -L "$tgt" ]]; then
-                mv "$tgt" "${tgt}.bak"
+            # If target exists and is NOT already a link to the correct source
+            if [[ -e "$tgt" ]]; then
+                if [[ -L "$tgt" ]]; then
+                    local current_link
+                    current_link=$(readlink -f "$tgt")
+                    if [[ "$current_link" == "$(readlink -f "$src")" ]]; then
+                        info "  > Already linked: $tgt"
+                        continue
+                    fi
+                    info "  > Replacing existing link: $tgt"
+                    rm -f "$tgt"
+                else
+                    info "  > Backing up existing file/dir: $tgt"
+                    mv -f "$tgt" "${tgt}.bak"
+                fi
             fi
 
             mkdir -p "$(dirname "$tgt")"
-            ln -sf "$src" "$tgt"
-            info "[Files] Linked $src -> $tgt"
+            if ln -sf "$src" "$tgt"; then
+                info "  > Linked $src -> $tgt"
+            else
+                warn "  > Failed to link $src -> $tgt"
+            fi
         else
-            warn "[Files] Source missing: $src"
+            warn "  > Source missing: $src"
         fi
     done
 }

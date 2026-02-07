@@ -8,19 +8,29 @@ resolve_configuration() {
     RESOLVED_BIN=""
     RESOLVED_PKGS=""
 
+    local raw_config
+    raw_config=$(jq -c ".\"$key\" // empty" "${USER_CONFIG_PATH}")
+    [[ -z "$raw_config" ]] && return 0
+
     local config_type
-    config_type=$(jq -r ".\"$key\" | type" "${USER_CONFIG_PATH}")
+    config_type=$(echo "$raw_config" | jq -r 'type')
 
     if [[ "$config_type" == "object" ]]; then
-        RESOLVED_BIN=$(jq -r ".\"$key\".bin // \"$default_bin\"" "${USER_CONFIG_PATH}")
-        RESOLVED_PKGS=$(jq -r ".\"$key\".packages[]? // empty" "${USER_CONFIG_PATH}")
+        RESOLVED_BIN=$(echo "$raw_config" | jq -r ".bin // \"$default_bin\"")
+        RESOLVED_PKGS=$(echo "$raw_config" | jq -r ".packages[]? // empty")
 
     elif [[ "$config_type" == "array" ]]; then
         RESOLVED_BIN="$default_bin"
-        RESOLVED_PKGS=$(jq -r ".\"$key\"[] | select(type==\"string\")" "${USER_CONFIG_PATH}")
-
-    else
-        return 0
+        # Extract both top-level strings and strings from nested objects
+        RESOLVED_PKGS=$(echo "$raw_config" | jq -r '
+            .[] | 
+            if type == "string" then 
+                . 
+            elif type == "object" then 
+                .packages[]? // empty
+            else 
+                empty 
+            end')
     fi
 }
 
