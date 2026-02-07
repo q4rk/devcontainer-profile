@@ -17,8 +17,24 @@ export LOG_FILE="$TEST_ROOT/devcontainer-profile.log"
 mkdir -p "$HOME" "$PLUGIN_DIR" "$MANAGED_CONFIG_DIR"
 touch "$LOG_FILE"
 
-# Copy real plugins from workspace
-REAL_PLUGIN_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../src/devcontainer-profile" && pwd)/scripts/plugins"
+# Discovery logic for plugin source
+if [[ -d "/usr/local/share/devcontainer-profile/plugins" ]]; then
+    REAL_PLUGIN_SRC="/usr/local/share/devcontainer-profile/plugins"
+elif [[ -d "$(pwd)/../../src/devcontainer-profile/scripts/plugins" ]]; then
+    REAL_PLUGIN_SRC="$(pwd)/../../src/devcontainer-profile/scripts/plugins"
+elif [[ -d "/workspaces/src/devcontainer-profile/scripts/plugins" ]]; then
+    REAL_PLUGIN_SRC="/workspaces/src/devcontainer-profile/scripts/plugins"
+else
+    # Last ditch effort: find it
+    REAL_PLUGIN_SRC=$(find / -type d -name "plugins" | grep "devcontainer-profile/scripts/plugins" | head -n 1 || true)
+fi
+
+if [[ -z "$REAL_PLUGIN_SRC" || ! -d "$REAL_PLUGIN_SRC" ]]; then
+    echo "(!) ERROR: Could not locate plugin source directory."
+    exit 1
+fi
+
+info "Using plugin source: $REAL_PLUGIN_SRC"
 cp "$REAL_PLUGIN_SRC"/*.sh "$PLUGIN_DIR/"
 
 log() { echo "[$1] $2"; }

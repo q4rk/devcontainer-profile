@@ -328,34 +328,83 @@ main() {
 
 
 
-    # If no config exists in the volume, stop here.
-
-    if [[ ! -f "${USER_CONFIG_PATH}" ]]; then
-
-        info "Core: No configuration file found (${USER_CONFIG_PATH}). Skipping personalization."
-
-        # We still touch the marker so we don't keep searching every single terminal open
-
-        touch "${INSTANCE_MARKER}"
-
-        chown "${TARGET_USER}:${TARGET_USER}" "${INSTANCE_MARKER}" || true
-
-        return 0
-
-    fi
+        # If no config exists in the volume, stop here.
 
 
 
-    current_hash=$(calculate_hash)
-    local current_hash
-    local last_hash=""
-    if [[ -f "${STATE_DIR}/last_applied_hash" ]]; then
-        last_hash=$(cat "${STATE_DIR}/last_applied_hash")
-    fi
-    if [[ "${current_hash}" == "${last_hash}" ]] && [[ -f "${INSTANCE_MARKER}" ]]; then
-        info "Core: Config unchanged and instance active. Skipping."
-        return 0
-    fi
+        if [[ ! -f "${USER_CONFIG_PATH}" ]]; then
+
+
+
+            info "Core: No configuration file found (${USER_CONFIG_PATH}). Skipping personalization."
+
+
+
+            # We still touch the marker so we don't keep searching every single terminal open
+
+
+
+            touch "${INSTANCE_MARKER}"
+
+
+
+            chown "${TARGET_USER}:${TARGET_USER}" "${INSTANCE_MARKER}" || true
+
+
+
+            return 0
+
+
+
+        fi
+
+
+
+    
+
+
+
+        local current_hash
+
+
+
+        current_hash=$(calculate_hash)
+
+
+
+        local last_hash=""
+
+
+
+        if [[ -f "${STATE_DIR}/last_applied_hash" ]]; then
+
+
+
+            last_hash=$(cat "${STATE_DIR}/last_applied_hash")
+
+
+
+        fi
+
+
+
+        if [[ "${current_hash}" == "${last_hash}" ]] && [[ -f "${INSTANCE_MARKER}" ]]; then
+
+
+
+            info "Core: Config unchanged and instance active. Skipping."
+
+
+
+            return 0
+
+
+
+        fi
+
+
+
+    
 
     run_plugins
     echo "${current_hash}" > "${STATE_DIR}/last_applied_hash"
