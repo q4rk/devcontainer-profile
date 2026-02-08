@@ -137,6 +137,10 @@ should_run() {
 }
 
 execute_plugins() {
+    if ! jq empty "${USER_CONFIG_PATH}" >/dev/null 2>&1; then
+        error "Core" "Invalid JSON in configuration file: ${USER_CONFIG_PATH}"
+        return 1
+    fi
     info "Core" "Starting plugin execution sequence..."
     
     # Reload path to ensure we see tools installed by previous steps

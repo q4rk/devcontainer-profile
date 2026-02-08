@@ -78,7 +78,7 @@ configure_sudo_and_user() {
     if command -v feature-installer >/dev/null 2>&1; then
         echo " Using feature-installer"
         # we invoke common-utils purely for the sudo/user logic
-        if feature-installer install ghcr.io/devcontainers/features/common-utils:2 \
+        if feature-installer feature install ghcr.io/devcontainers/features/common-utils:2 \
             --option installZsh=false \
             --option upgradePackages=false \
             --option username="${user}" \
@@ -117,6 +117,10 @@ deploy_assets() {
     mkdir -p "${INSTALL_DIR}/plugins"
     mkdir -p "${INSTALL_DIR}/lib"
     
+    # Create the PARENT workspace with Sticky Bit so users can create 'shellhistory' etc.
+    mkdir -p /var/tmp/devcontainer-profile
+    chmod 1777 /var/tmp/devcontainer-profile
+
     # State directory (writable by users)
     mkdir -p /var/tmp/devcontainer-profile/state
     chmod 1777 /var/tmp/devcontainer-profile/state
