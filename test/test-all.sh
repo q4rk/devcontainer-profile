@@ -12,4 +12,4 @@ if [ -f "./test/devcontainer-profile/test_runner_local.sh" ]; then
 fi
 
 echo ">>> Running Feature Scenarios (Dockerized)..."
-devcontainer features test --scenarios test/devcontainer-profile --project-folder .
+devcontainer features test -f devcontainer-profile --project-folder .
