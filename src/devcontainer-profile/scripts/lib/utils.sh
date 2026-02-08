@@ -48,6 +48,23 @@ detect_user_context() {
     export USER_CONFIG_PATH="${VOLUME_CONFIG_DIR}/config.json"
 }
 
+# --- Filesystem Helpers ---
+
+safe_chown() {
+    local target_user="$1"
+    local path="$2"
+    local group
+    group=$(id -gn "${target_user}" 2>/dev/null || echo "${target_user}")
+    
+    if [[ -L "$path" ]]; then
+        chown -h "${target_user}:${group}" "$path" 2>/dev/null || true
+    elif [[ -d "$path" ]]; then
+        ensure_root chown -R "${target_user}:${group}" "$path"
+    else
+        ensure_root chown "${target_user}:${group}" "$path"
+    fi
+}
+
 # --- System ---
 ensure_root() {
     if [[ $(id -u) -eq 0 ]]; then

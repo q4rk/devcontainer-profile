@@ -13,6 +13,7 @@ trap show_logs EXIT
 
 check "Running as root" [ "$(id -u)" -eq 0 ]
 
+rm -rf "/root/.devcontainer.profile"
 mkdir -p "/root/.devcontainer.profile"
 echo '{"env": {"ROOT_TEST": "1"}}' > "/root/.devcontainer.profile/config.json"
 

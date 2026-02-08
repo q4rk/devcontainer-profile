@@ -29,7 +29,7 @@ detect_user_context
 
 readonly LOCK_FILE="${STATE_DIR}/engine.lock"
 readonly HASH_FILE="${STATE_DIR}/last_applied_hash"
-readonly INSTANCE_MARKER="${TARGET_HOME}/.devcontainer-profile.applied"
+readonly INSTANCE_MARKER="${TARGET_HOME}/.devcontainer.profile.applied"
 readonly LOG_FILE="${STATE_DIR}/profile.log"
 readonly PLUGIN_DIR="${PLUGIN_DIR:-/usr/local/share/devcontainer-profile/plugins}"
 
@@ -61,16 +61,16 @@ discover_configuration() {
 
     # 2. Check Host Mounts (Discovery)
     local candidates=(
-        "${WORKSPACE}/.config/.devcontainer-profile/config.json"
-        "${WORKSPACE}/.config/.devcontainer-profile/devcontainer.profile.json"
-        "${WORKSPACE}/.config/.devcontainer-profile/.devcontainer.profile"
-        "/etc/user-host-config/devcontainer-profile/config.json"
+        "${WORKSPACE}/.config/.devcontainer.profile/config.json"
+        "${WORKSPACE}/.config/.devcontainer.profile/devcontainer.profile.json"
+        "${WORKSPACE}/.config/.devcontainer.profile/.devcontainer.profile"
+        "/etc/user-host-config/devcontainer.profile/config.json"
         "${MANAGED_CONFIG_DIR}/config.json"
         "${MANAGED_CONFIG_DIR}/devcontainer.profile.json"
         "${MANAGED_CONFIG_DIR}/.devcontainer.profile"
-        "${TARGET_HOME}/.config/devcontainer-profile/config.json"
-        "${TARGET_HOME}/.config/devcontainer-profile/devcontainer.profile.json"
-        "${TARGET_HOME}/.config/devcontainer-profile/.devcontainer.profile"
+        "${TARGET_HOME}/.config/devcontainer.profile/config.json"
+        "${TARGET_HOME}/.config/devcontainer.profile/devcontainer.profile.json"
+        "${TARGET_HOME}/.config/devcontainer.profile/.devcontainer.profile"
     )
 
     local found_config=""
@@ -85,7 +85,7 @@ discover_configuration() {
         info "Core" "Ingesting configuration: ${found_config}"
         ensure_root mkdir -p "${VOLUME_CONFIG_DIR}"
         ensure_root cp -L "${found_config}" "${VOLUME_CONFIG_DIR}/config.json"
-        ensure_root chown "${TARGET_USER}:$(id -gn "${TARGET_USER}")" "${VOLUME_CONFIG_DIR}/config.json"
+        safe_chown "${TARGET_USER}" "${VOLUME_CONFIG_DIR}/config.json"
     else
         info "Core" "No configuration found. Engine will stand by."
         return 1
@@ -113,8 +113,7 @@ link_managed_directory() {
 
     rm -rf "${link_target}"
     ln -s "${VOLUME_CONFIG_DIR}" "${link_target}"
-    # chown might fail if user doesn't exist in unit tests, so we fail soft
-    chown -h "${TARGET_USER}:$(id -gn "${TARGET_USER}")" "${link_target}" 2>/dev/null || true
+    safe_chown "${TARGET_USER}" "${link_target}"
     info "Core" "Linked ${link_target} -> ${VOLUME_CONFIG_DIR}"
 }
 
@@ -200,7 +199,7 @@ main() {
             mv "${HASH_FILE}.new" "${HASH_FILE}"
         fi
         touch "${INSTANCE_MARKER}"
-        ensure_root chown "${TARGET_USER}:$(id -gn "${TARGET_USER}")" "${INSTANCE_MARKER}"
+        safe_chown "${TARGET_USER}" "${INSTANCE_MARKER}"
         info "Core" "Profile applied successfully."
     else
         info "Core" "No changes detected. Skipping."

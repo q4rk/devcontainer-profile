@@ -22,10 +22,10 @@ setup_hermetic_env() {
     # Engine specific vars
     export TARGET_USER="$(id -un)"
     export TARGET_HOME="$HOME"
-    export MANAGED_CONFIG_DIR="$HOME/.devcontainer-profile"
+    export MANAGED_CONFIG_DIR="$HOME/.devcontainer.profile"
     export VOLUME_CONFIG_DIR="$STATE_DIR/configs"
     export USER_CONFIG_PATH="$VOLUME_CONFIG_DIR/config.json"
-    export INSTANCE_MARKER="$HOME/.devcontainer-profile.applied"
+    export INSTANCE_MARKER="$HOME/.devcontainer.profile.applied"
     
     # Create structure
     mkdir -p "$HOME" "$STATE_DIR" "$VOLUME_CONFIG_DIR" "$WORKSPACE/tmp"

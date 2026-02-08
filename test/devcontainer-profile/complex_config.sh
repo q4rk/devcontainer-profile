@@ -12,6 +12,7 @@ show_logs() {
 trap show_logs EXIT
 
 # Setup: Create a config that uses multiple features
+rm -rf "$HOME/.devcontainer.profile"
 mkdir -p "$HOME/.devcontainer.profile"
 cat <<EOF > "$HOME/.devcontainer.profile/config.json"
 {

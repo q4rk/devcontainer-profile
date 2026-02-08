@@ -48,6 +48,7 @@ run_files() {
 
         mkdir -p "$(dirname "$tgt")"
         if ln -sf "$src" "$tgt"; then
+            safe_chown "${TARGET_USER}" "$tgt"
             info "Files" "Linked $src -> $tgt"
         else
             error "Files" "Failed to link $tgt"

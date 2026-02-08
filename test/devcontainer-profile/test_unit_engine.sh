@@ -24,8 +24,8 @@ mock_tool "sudo"
 
 # --- Test 1: Config Discovery & Ingestion ---
 echo "--- Test 1: Config Ingestion ---"
-mkdir -p "$WORKSPACE/.config/.devcontainer-profile"
-echo '{"apt": ["vim"]}' > "$WORKSPACE/.config/.devcontainer-profile/config.json"
+mkdir -p "$WORKSPACE/.config/.devcontainer.profile"
+echo '{"apt": ["vim"]}' > "$WORKSPACE/.config/.devcontainer.profile/config.json"
 
 # Run Apply
 "$INSTALL_DIR/scripts/apply.sh"

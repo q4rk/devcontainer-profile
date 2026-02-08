@@ -27,8 +27,9 @@ run_discovery() {
 }
 
 # 1. Test: Implicit Config (baked in image)
-mkdir -p "$HOME/.devcontainer.profile"
-echo '{"test": "test-baked"}' > "$HOME/.devcontainer.profile/config.json"
+mkdir -p "$MANAGED_CONFIG_DIR"
+echo '{"test": "test-baked"}' > "$MANAGED_CONFIG_DIR/config.json"
+
 run_discovery
 if grep -q "test-baked" "$VOLUME_CONFIG_DIR/config.json"; then
     log_pass "Found ~/.devcontainer.profile/config.json"
@@ -37,18 +38,19 @@ else
 fi
 
 # 2. Test: XDG Config Home
-mkdir -p "$HOME/.config/devcontainer-profile"
-echo '{"test": "test-xdg"}' > "$HOME/.config/devcontainer-profile/config.json"
+# Standardize on .devcontainer.profile (with dot)
+mkdir -p "$HOME/.config/devcontainer.profile"
+echo '{"test": "test-xdg"}' > "$HOME/.config/devcontainer.profile/config.json"
 run_discovery
 if grep -q "test-xdg" "$VOLUME_CONFIG_DIR/config.json"; then
-    log_pass "Found ~/.config/devcontainer-profile/config.json (Precedence over home)"
+    log_pass "Found ~/.config/devcontainer.profile/config.json (Precedence over home)"
 else
     log_fail "XDG config did not override home config"
 fi
 
 # 3. Test: Bind Mount (Highest Priority)
-mkdir -p "$WORKSPACE/.config/.devcontainer-profile"
-echo '{"test": "test-mount"}' > "$WORKSPACE/.config/.devcontainer-profile/config.json"
+mkdir -p "$WORKSPACE/.config/.devcontainer.profile"
+echo '{"test": "test-mount"}' > "$WORKSPACE/.config/.devcontainer.profile/config.json"
 run_discovery
 if grep -q "test-mount" "$VOLUME_CONFIG_DIR/config.json"; then
     log_pass "Found Bind Mount config (Highest priority)"

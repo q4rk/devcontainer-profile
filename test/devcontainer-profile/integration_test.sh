@@ -13,6 +13,7 @@ trap show_logs EXIT
 
 # 1. Complex Configuration
 # Create the directory first as it's now our managed path
+rm -rf "$HOME/.devcontainer.profile"
 mkdir -p "$HOME/.devcontainer.profile"
 cat << EOF > "$HOME/.devcontainer.profile/config.json"
 {
