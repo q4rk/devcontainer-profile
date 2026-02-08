@@ -21,7 +21,8 @@ get_tool_bin() {
 get_tool_pkgs() {
     local key="$1"
     if [[ -f "${USER_CONFIG_PATH}" ]]; then
-        jq -r ".[\"${key}\"] | if type==\"object\" then .packages[]? else .[]? end" "${USER_CONFIG_PATH}" 2>/dev/null
+        # Handle Array (direct list, filtering only strings) OR Object (.packages list)
+        jq -r ".[\"${key}\"] | if type==\"object\" then .packages[]? else .[]? | if type==\"string\" then . else empty end end" "${USER_CONFIG_PATH}" 2>/dev/null
     fi
 }
 
@@ -74,7 +75,7 @@ install_pip() {
             args+=("--break-system-packages")
         fi
         mapfile -t pkg_array <<< "$packages"
-        "$pip_bin" "${args[@]}" "${pkg_array[@]}" || warn "Pip" "Installation failed"
+        ensure_root "$pip_bin" "${args[@]}" "${pkg_array[@]}" || warn "Pip" "Installation failed"
     else
         warn "Pip" "Binary '$raw_bin_name' not found. Skipping."
     fi
@@ -93,7 +94,7 @@ install_npm() {
     if [[ -n "$npm_bin" ]]; then
         info "Npm" "Installing global packages using '$raw_bin_name'..."
         mapfile -t pkg_array <<< "$packages"
-        "$npm_bin" install -g "${pkg_array[@]}" || warn "Npm" "Installation failed"
+        ensure_root "$npm_bin" install -g "${pkg_array[@]}" || warn "Npm" "Installation failed"
     else
         warn "Npm" "Binary '$raw_bin_name' not found. Skipping."
     fi
@@ -114,7 +115,7 @@ install_go() {
         while IFS= read -r pkg; do
              [[ -z "$pkg" ]] && continue
              [[ "$pkg" != *"@"* ]] && pkg="${pkg}@latest"
-             "$go_bin" install "$pkg" || warn "Go" "Failed: $pkg"
+             ensure_root "$go_bin" install "$pkg" || warn "Go" "Failed: $pkg"
         done <<< "$packages"
     else
         warn "Go" "Binary '$raw_bin_name' not found. Skipping."
@@ -143,11 +144,11 @@ install_cargo() {
         fi
 
         # Optimization: Update registry index once
-        "$cargo_bin" search --limit 1 verify-network >/dev/null 2>&1 || true
+        ensure_root "$cargo_bin" search --limit 1 verify-network >/dev/null 2>&1 || true
 
         while IFS= read -r pkg; do
             [[ -z "$pkg" ]] && continue
-            "$cargo_bin" install "$pkg" || warn "Cargo" "Failed: $pkg"
+            ensure_root "$cargo_bin" install "$pkg" || warn "Cargo" "Failed: $pkg"
         done <<< "$packages"
     else
         warn "Cargo" "Binary '$raw_bin_name' not found. Skipping."
