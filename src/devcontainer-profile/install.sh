@@ -20,9 +20,15 @@ check_cmd() { command -v "$1" >/dev/null 2>&1; }
 
 ensure_dependencies() {
     local missing=()
+    # ca-certificates is critical for curl to verify SSL connections
     for cmd in jq curl sudo unzip gpg; do
         if ! check_cmd "$cmd"; then missing+=("$cmd"); fi
     done
+    
+    # Always ensure ca-certificates is present
+    if ! dpkg -s ca-certificates >/dev/null 2>&1; then
+        missing+=("ca-certificates")
+    fi
 
     if [ ${#missing[@]} -gt 0 ]; then
         log "Installing build dependencies: ${missing[*]}"
@@ -36,6 +42,10 @@ ensure_dependencies() {
         if ! apt-get install -y --no-install-recommends "${missing[@]}"; then
             error "Failed to install dependencies."
             exit 1
+        fi
+        
+        if check_cmd update-ca-certificates; then
+            update-ca-certificates >/dev/null 2>&1 || true
         fi
     fi
 }
