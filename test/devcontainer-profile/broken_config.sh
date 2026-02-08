@@ -12,6 +12,8 @@ show_logs() {
 trap show_logs EXIT
 
 # 1. Inject Invalid JSON
+# Standardize: Must remove existing symlink if engine ran first
+rm -rf "$HOME/.devcontainer.profile"
 mkdir -p "$HOME/.devcontainer.profile"
 echo '{ "invalid": "json", broken_comma, }' > "$HOME/.devcontainer.profile/config.json"
 

@@ -3,8 +3,13 @@
 source "${LIB_PATH}"
 
 # Ensure we have common environments loaded
-[[ -f "/usr/local/cargo/env" ]] && . "/usr/local/cargo/env"
-[[ -f "${TARGET_HOME}/.cargo/env" ]] && . "${TARGET_HOME}/.cargo/env"
+load_cargo_env() {
+    [[ -f "/usr/local/cargo/env" ]] && . "/usr/local/cargo/env"
+    [[ -f "${TARGET_HOME}/.cargo/env" ]] && . "${TARGET_HOME}/.cargo/env"
+    # Export for subshells
+    export PATH="${PATH}"
+}
+load_cargo_env
 
 # Helper: Extract binary name, defaulting if necessary
 get_tool_bin() {
@@ -30,7 +35,7 @@ get_tool_pkgs() {
 resolve_binary() {
     local cmd="$1"
     if command -v "$cmd" >/dev/null 2>&1; then
-        echo "$cmd"
+        command -v "$cmd"
         return 0
     fi
     
@@ -75,7 +80,7 @@ install_pip() {
             args+=("--break-system-packages")
         fi
         mapfile -t pkg_array <<< "$packages"
-        ensure_root "$pip_bin" "${args[@]}" "${pkg_array[@]}" || warn "Pip" "Installation failed"
+        "$pip_bin" "${args[@]}" "${pkg_array[@]}" || warn "Pip" "Installation failed"
     else
         warn "Pip" "Binary '$raw_bin_name' not found. Skipping."
     fi
@@ -115,7 +120,7 @@ install_go() {
         while IFS= read -r pkg; do
              [[ -z "$pkg" ]] && continue
              [[ "$pkg" != *"@"* ]] && pkg="${pkg}@latest"
-             ensure_root "$go_bin" install "$pkg" || warn "Go" "Failed: $pkg"
+             "$go_bin" install "$pkg" || warn "Go" "Failed: $pkg"
         done <<< "$packages"
     else
         warn "Go" "Binary '$raw_bin_name' not found. Skipping."
@@ -127,6 +132,9 @@ install_cargo() {
     packages=$(get_tool_pkgs "cargo")
     [[ -z "$packages" ]] && return 0
     
+    # Reload env just in case rust was installed by features plugin in this same run
+    load_cargo_env
+
     local raw_bin_name
     raw_bin_name=$(get_tool_bin "cargo" "cargo")
     local cargo_bin
@@ -140,15 +148,17 @@ install_cargo() {
             if ! rustup default >/dev/null 2>&1; then
                 info "Cargo" "Setting rustup default to stable..."
                 rustup default stable || true
+                # Re-resolve after potential toolchain install
+                cargo_bin=$(resolve_binary "$raw_bin_name")
             fi
         fi
 
         # Optimization: Update registry index once
-        ensure_root "$cargo_bin" search --limit 1 verify-network >/dev/null 2>&1 || true
+        "$cargo_bin" search --limit 1 verify-network >/dev/null 2>&1 || true
 
         while IFS= read -r pkg; do
             [[ -z "$pkg" ]] && continue
-            ensure_root "$cargo_bin" install "$pkg" || warn "Cargo" "Failed: $pkg"
+            "$cargo_bin" install "$pkg" || warn "Cargo" "Failed: $pkg"
         done <<< "$packages"
     else
         warn "Cargo" "Binary '$raw_bin_name' not found. Skipping."
