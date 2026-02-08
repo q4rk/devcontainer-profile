@@ -23,7 +23,7 @@ vscode_extensions() {
 
     # Get currently installed extensions to skip duplicates
     local installed_exts
-    installed_exts=$($code_bin --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]')
+    installed_exts=$($code_bin --list-extensions 2>/dev/null | tr -d '\0' | tr '[:upper:]' '[:lower:]')
     info "  Currently installed extensions: $(echo "${installed_exts}" | xargs)"
 
     for id in "${ext_ids[@]}"; do

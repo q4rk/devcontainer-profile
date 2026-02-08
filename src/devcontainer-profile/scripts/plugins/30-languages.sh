@@ -79,7 +79,7 @@ discover_binary() {
     # 3. Special Fallback for Rustup
     if [[ "$cmd" == "cargo" ]]; then
         local r_bin=""
-        if command -v rustup >/dev/null 2>&1; then r_bin="rustup";
+        if command -v rustup >/dev/null 2>&1; then r_bin=$(command -v rustup);
         elif [[ -x "/usr/local/rustup/bin/rustup" ]]; then r_bin="/usr/local/rustup/bin/rustup";
         elif [[ -x "/usr/local/cargo/bin/rustup" ]]; then r_bin="/usr/local/cargo/bin/rustup";
         elif [[ -x "${HOME}/.cargo/bin/rustup" ]]; then r_bin="${HOME}/.cargo/bin/rustup"; fi
@@ -87,6 +87,14 @@ discover_binary() {
         if [[ -n "$r_bin" ]]; then
             local r_cargo
             r_cargo=$($r_bin which cargo 2>/dev/null || true)
+            
+            # If rustup which cargo failed, maybe no default toolchain?
+            if [[ -z "$r_cargo" ]]; then
+                # Attempt to set default stable if none exists
+                $r_bin default stable >/dev/null 2>&1 || true
+                r_cargo=$($r_bin which cargo 2>/dev/null || true)
+            fi
+
             if [[ -n "$r_cargo" ]] && [[ -x "$r_cargo" ]]; then
                 DISCOVERED_BIN="$r_cargo"
                 export PATH="$(dirname "$r_cargo"):$PATH"
@@ -184,7 +192,7 @@ languages() {
             # Self-healing toolchain
             if ! "$cargo_bin" --version >/dev/null 2>&1; then
                 local r_bin=""
-                if command -v rustup >/dev/null 2>&1; then r_bin="rustup"
+                if command -v rustup >/dev/null 2>&1; then r_bin=$(command -v rustup)
                 else r_bin="$(dirname "$cargo_bin")/rustup"; fi
                 
                 if [[ -x "$r_bin" ]]; then
