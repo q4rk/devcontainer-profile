@@ -1,221 +1,177 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+#
+# apply.sh
+# Core orchestration engine for devcontainer-profile
+#
+
 set -o nounset
 set -o pipefail
+# We don't use 'set -e' globally here because we want to capture plugin failures 
+# and log them without crashing the entire orchestration.
 
-# Determine the target user and home directory
+# --- Environment Setup ---
 export TARGET_USER="${_REMOTE_USER:-$(id -un)}"
 export TARGET_HOME
 TARGET_HOME=$(getent passwd "${TARGET_USER}" | cut -d: -f6)
 export TARGET_HOME="${TARGET_HOME:-$HOME}"
 
+# Core Paths
 export WORKSPACE="/var/tmp/devcontainer-profile"
 export STATE_DIR="${WORKSPACE}/state"
-export LOG_FILE="${STATE_DIR}/devcontainer-profile.log"
 export LOCK_FILE="${STATE_DIR}/devcontainer-profile.lock"
 export INSTANCE_MARKER="${TARGET_HOME}/.devcontainer-profile.applied"
 export MANAGED_CONFIG_DIR="${TARGET_HOME}/.devcontainer-profile"
-export VOLUME_CONFIG_DIR="${STATE_DIR}/configs"
 export USER_CONFIG_PATH="${MANAGED_CONFIG_DIR}/config.json"
-export USER_PATH_FILE="${TARGET_HOME}/.devcontainer.profile_path"
-export CONFIG_MOUNT="${WORKSPACE}/.config/.devcontainer-profile"
-export ALTERNATIVE_CONFIG_MOUNT="/etc/user-host-config/devcontainer-profile"
 export PLUGIN_DIR="/usr/local/share/devcontainer-profile/plugins"
+export LIB_DIR="/usr/local/share/devcontainer-profile/lib"
 
-log() { echo "[$(date +'%Y-%m-%dT%H:%M:%S')] [$1] $2" | tee -a "${LOG_FILE}" >&2; }
-info() { log "INFO" "$1"; }
-warn() { log "WARN" "$1"; }
-error() { log "ERROR" "$1"; }
-export -f log info warn error
+# Load Library
+# shellcheck source=./lib/utils.sh
+if [[ -f "${LIB_DIR}/utils.sh" ]]; then
+    source "${LIB_DIR}/utils.sh"
+else
+    # Fallback for local testing
+    source "$(dirname "$0")/../lib/utils.sh"
+fi
 
-ensure_root() {
-    if [[ $(id -u) -eq 0 ]]; then
-        "$@"
-    else
-        if command -v sudo >/dev/null 2>&1; then
-            # Use -H to set HOME to /root, satisfying rustup/installers
-            # and -E to preserve the environment (including TARGET_HOME)
-            sudo -n -E -H "$@"
-        else
-            "$@"
-        fi
+# --- Core Functions ---
+
+setup_workspace() {
+    ensure_root mkdir -p "${STATE_DIR}" "${WORKSPACE}/tmp" "${WORKSPACE}/configs"
+    ensure_root chown -R "${TARGET_USER}:${TARGET_USER}" "${WORKSPACE}"
+    ensure_root chmod 1777 "${WORKSPACE}/tmp"
+    
+    if [[ ! -f "${LOG_FILE}" ]]; then
+        ensure_root touch "${LOG_FILE}"
+        ensure_root chown "${TARGET_USER}:${TARGET_USER}" "${LOG_FILE}"
     fi
 }
 
 acquire_lock() {
-    ensure_root mkdir -p "${STATE_DIR}"
+    # File Descriptor 200 used for locking
     exec 200>"${LOCK_FILE}"
     if ! flock -n 200; then
-        warn "Core: Waiting for lock (held by another process)..."
+        warn "Core: Waiting for lock..."
         if ! flock -w 30 200; then
-            error "Core: Could not acquire lock after 30s. Exiting."
-            return 1
+            error "Core: Timeout waiting for lock. Exiting."
+            exit 1
         fi
     fi
 }
 
-init_workspace() {
-    ensure_root mkdir -p "${STATE_DIR}" "${WORKSPACE}/tmp" "${VOLUME_CONFIG_DIR}" || return 1
-    
-    # Ensure ownership of the entire workspace for the target user
-    ensure_root chown -R "${TARGET_USER}:${TARGET_USER}" "${WORKSPACE}" >/dev/null 2>&1 || true
-    
-    ensure_root chmod 1777 /tmp >/dev/null 2>&1 || true
-    ensure_root chmod 1777 "${WORKSPACE}/tmp" >/dev/null 2>&1 || true
-    
-    # Ensure log file is writable by current user
-    ensure_root touch "${LOG_FILE}" || return 1
-    ensure_root chown "${TARGET_USER}:${TARGET_USER}" "${LOG_FILE}" >/dev/null 2>&1 || true
-}
+discover_configuration() {
+    # If config is already active in volume, we rely on it.
+    # Otherwise, we ingest from host mounts or home dir.
+    if [[ -f "${WORKSPACE}/configs/config.json" ]]; then return; fi
 
-add_to_path() {
-    local dir="$1"
-    if [[ -d "$dir" ]] && [[ ":$PATH:" != *":$dir:"* ]]; then
-        export PATH="$PATH:$dir"
-    fi
-}
-
-reload_path() {
-    # shellcheck source=/dev/null
-    if [[ -f "${USER_PATH_FILE}" ]]; then source "${USER_PATH_FILE}"; fi
-    
-    # Priority paths for Dev Containers
-    local critical_paths=(
-        "/usr/games"
-        "${TARGET_HOME}/.local/bin"
-        "${TARGET_HOME}/go/bin"
-        "${TARGET_HOME}/.cargo/bin"
-        "/usr/local/cargo/bin"
-        "/usr/local/rustup/bin"
-        "/usr/local/go/bin"
-        "/usr/local/python/bin"
-        "/usr/local/py-utils/bin"
-        "/usr/local/share/nvm/current/bin"
-        "/home/linuxbrew/.linuxbrew/bin"
+    local candidates=(
+        "${WORKSPACE}/.config/.devcontainer-profile/config.json"
+        "${WORKSPACE}/.config/.devcontainer-profile/devcontainer.profile.json"
+        "${TARGET_HOME}/.devcontainer.profile"
+        "${TARGET_HOME}/config.json"
     )
+
+    info "Core: Discovering configuration..."
     
-    for p in "${critical_paths[@]}"; do add_to_path "$p"; done
+    for c in "${candidates[@]}"; do
+        if [[ -f "$c" ]]; then
+            info "Core: Found configuration at $c"
+            cp "$c" "${WORKSPACE}/configs/config.json"
+            return
+        fi
+    done
+}
 
-    # Dynamic discovery (limited depth to avoid hanging on large filesystems)
-    # We only scan /usr/local and /opt as they are common for OCI Features
-    while IFS= read -r dir; do
-        add_to_path "$dir"
-    done < <(find /usr/local /opt -maxdepth 3 -type d -name bin 2>/dev/null | grep -vE "^/usr/local/bin$|^/usr/bin$|^/bin$")
+link_configuration() {
+    # Create the "Solid Link"
+    # We use a temp link and atomic move to ensure robustness
+    local link_target="${WORKSPACE}/configs"
+    local link_name="${MANAGED_CONFIG_DIR}"
     
-    export PATH
-}
-
-calculate_hash() {
-    if [[ -f "${USER_CONFIG_PATH}" ]]; then
-        md5sum "${USER_CONFIG_PATH}" | awk '{print $1}'
-    else
-        echo "none"
+    if [[ "$(readlink -f "${link_name}" 2>/dev/null)" != "${link_target}" ]]; then
+        rm -rf "${link_name}"
+        ln -sfn "${link_target}" "${link_name}"
+        info "Core: Linked ${link_name} -> ${link_target}"
     fi
 }
 
-run_plugins() {
-    if [[ -d "$PLUGIN_DIR" ]]; then
-        reload_path
-        # Export TARGET variables for plugins
-        export HOME="${TARGET_HOME}"
-        export USER="${TARGET_USER}"
-        export USER_CONFIG_PATH="${USER_CONFIG_PATH}"
-        export LOG_FILE="${LOG_FILE}"
-        
-        for script in $(find "$PLUGIN_DIR"/*.sh | sort); do
-            if [[ -f "$script" ]]; then
-                info "Running Plugin: $(basename "$script")"
-                # shellcheck source=/dev/null
-                ( set -o errexit; source "$script" ) >>"${LOG_FILE}" 2>&1 || warn "Plugin failed: $(basename "$script")"
-                reload_path
-            fi
-        done
-    else
-        error "Core: Plugin directory missing."
-    fi
-}
-
-main() {
-    if ! init_workspace; then
-        echo "(!) ERROR: Could not initialize workspace." >&2
-        return 0
-    fi
-
-    if ! acquire_lock; then return 0; fi
-    info "=== STARTING DEV CONTAINER PROFILE ENGINE (User: ${TARGET_USER}, Home: ${TARGET_HOME}) ==="
-
-    if [[ -f "/usr/local/share/devcontainer-profile/defaults.env" ]]; then
-        # shellcheck source=/dev/null
-        source "/usr/local/share/devcontainer-profile/defaults.env"
-    fi
-
-    # Ingest if the volume is empty OR if config.json specifically is missing
-    if [[ ! -f "${VOLUME_CONFIG_DIR}/config.json" ]]; then
-        local config_source=""
-        local discovery_dirs=(
-            "${CONFIG_MOUNT}"
-            "${ALTERNATIVE_CONFIG_MOUNT}"
-        )
-        info "Core: Searching for initial configuration..."
-        for d in "${discovery_dirs[@]}"; do
-            if [[ -f "${d}" ]]; then config_source="${d}"; break
-            elif [[ -d "${d}" ]]; then
-                for f in "config.json" "devcontainer.profile.json" ".devcontainer.profile" ".devcontainer-profile"; do
-                    if [[ -f "${d}/${f}" ]]; then config_source="${d}/${f}"; break 2; fi
-                done
-            fi
-        done
-        
-        # Check TARGET_HOME-based discovery files if mount-based discovery failed
-        if [[ -z "$config_source" ]]; then
-            for f in ".devcontainer.profile" ".devcontainer-profile" "config.json" "devcontainer.profile.json"; do
-                if [[ -f "${TARGET_HOME}/${f}" ]] && [[ ! -L "${TARGET_HOME}/${f}" ]]; then
-                    config_source="${TARGET_HOME}/${f}"
-                    break
-                fi
-            done
-        fi
-
-        if [[ -n "$config_source" ]]; then
-            info "Core: Ingesting initial config to volume: ${config_source}"
-            cp -L "$config_source" "${VOLUME_CONFIG_DIR}/config.json" || true
-            chown "${TARGET_USER}:${TARGET_USER}" "${VOLUME_CONFIG_DIR}/config.json" || true
-        fi
-    fi
-
-    if [[ -e "${MANAGED_CONFIG_DIR}" ]] && [[ ! -L "${MANAGED_CONFIG_DIR}" ]]; then
-        mv "${MANAGED_CONFIG_DIR}" "${MANAGED_CONFIG_DIR}.bak_$(date +%s)" || true
-    fi
-    rm -rf "${MANAGED_CONFIG_DIR}"
-    ln -sf "${VOLUME_CONFIG_DIR}" "${MANAGED_CONFIG_DIR}"
-    chown -h "${TARGET_USER}:${TARGET_USER}" "${MANAGED_CONFIG_DIR}" || true
-    info "Core: Link established: ${MANAGED_CONFIG_DIR} -> ${VOLUME_CONFIG_DIR}"
-
-    # If no config exists in the volume, stop here.
+check_state_hash() {
     if [[ ! -f "${USER_CONFIG_PATH}" ]]; then
-        info "Core: No configuration file found (${USER_CONFIG_PATH}). Skipping personalization."
-        # We still touch the marker so we don't keep searching every single terminal open
-        touch "${INSTANCE_MARKER}"
-        chown "${TARGET_USER}:${TARGET_USER}" "${INSTANCE_MARKER}" || true
-        return 0
+        info "Core: No config found. Skipping."
+        return 0 # Clean exit
     fi
 
     local current_hash
-    current_hash=$(calculate_hash)
+    current_hash=$(md5sum "${USER_CONFIG_PATH}" | awk '{print $1}')
     local last_hash=""
+    
     if [[ -f "${STATE_DIR}/last_applied_hash" ]]; then
         last_hash=$(cat "${STATE_DIR}/last_applied_hash")
     fi
+
     if [[ "${current_hash}" == "${last_hash}" ]] && [[ -f "${INSTANCE_MARKER}" ]]; then
-        info "Core: Config unchanged and instance active. Skipping."
+        info "Core: Configuration unchanged. Skipping."
         return 0
     fi
 
-    run_plugins
-    echo "${current_hash}" > "${STATE_DIR}/last_applied_hash"
-    touch "${INSTANCE_MARKER}"
-    chown "${TARGET_USER}:${TARGET_USER}" "${STATE_DIR}/last_applied_hash" "${INSTANCE_MARKER}" || true
-    info "=== COMPLETED (Final PATH: $PATH) ==="
+    # Return 1 to indicate "Proceed with apply"
+    echo "${current_hash}" > "${STATE_DIR}/current_run_hash"
+    return 1
 }
 
-main "$@" || true
-exit 0
+run_plugins() {
+    if [[ ! -d "$PLUGIN_DIR" ]]; then return; fi
+    
+    info "Core: Running plugins..."
+    
+    # Use nullglob to handle empty directory safely
+    shopt -s nullglob
+    for script in "$PLUGIN_DIR"/*.sh; do
+        local script_name
+        script_name=$(basename "$script")
+        
+        info ">>> Plugin: ${script_name}"
+        
+        # Run in subshell with strict error handling, but don't kill main loop
+        (
+            set -o errexit
+            # shellcheck source=/dev/null
+            source "$script"
+        ) || error "Plugin ${script_name} failed."
+        
+    done
+    shopt -u nullglob
+}
+
+finalize() {
+    local hash_file="${STATE_DIR}/current_run_hash"
+    if [[ -f "$hash_file" ]]; then
+        mv "$hash_file" "${STATE_DIR}/last_applied_hash"
+    fi
+    touch "${INSTANCE_MARKER}"
+}
+
+# --- Main Execution ---
+
+main() {
+    setup_workspace
+    acquire_lock
+    
+    # Trap for lock release isn't strictly necessary with flock on FD 
+    # as the OS closes FDs on exit, releasing the lock.
+    
+    discover_configuration
+    link_configuration
+    
+    if check_state_hash; then
+        exit 0
+    fi
+
+    info "=== STARTING PROFILE APPLICATION (User: $TARGET_USER) ==="
+    run_plugins
+    finalize
+    info "=== COMPLETED ==="
+}
+
+main "$@"

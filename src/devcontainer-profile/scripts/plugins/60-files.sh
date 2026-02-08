@@ -1,49 +1,55 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-files() {
-    local has_files
-    has_files=$(jq '.files | if . == null then "no" else "yes" end' "${USER_CONFIG_PATH}")
-    [[ "$has_files" == "\"no\"" ]] && return
+# Plugin: Files
+# Manages dotfiles via symlinks
+
+link_files() {
+    local files_json
+    files_json=$(jq -c '.files[]? // empty' "${USER_CONFIG_PATH}")
+    [[ -z "$files_json" ]] && return
 
     info "[Files] Linking dotfiles..."
-    jq -c '.files[]?' "${USER_CONFIG_PATH}" | while read -r item; do
-        [[ -z "$item" || "$item" == "null" ]] && continue
+
+    echo "$files_json" | while read -r item; do
         local src tgt
         src=$(echo "$item" | jq -r '.source')
         tgt=$(echo "$item" | jq -r '.target')
 
-        # Expand ~ manually to avoid eval issues in some contexts
+        # Expand HOME
         src="${src/#\~/$HOME}"
         tgt="${tgt/#\~/$HOME}"
+        
+        # Skip if source missing
+        if [[ ! -e "$src" ]]; then
+            warn "Skipping link: Source missing ($src)"
+            continue
+        fi
 
-        if [[ -e "$src" ]]; then
-            # If target exists and is NOT already a link to the correct source
-            if [[ -e "$tgt" ]]; then
-                if [[ -L "$tgt" ]]; then
-                    local current_link
-                    current_link=$(readlink -f "$tgt")
-                    if [[ "$current_link" == "$(readlink -f "$src")" ]]; then
-                        info "  > Already linked: $tgt"
-                        continue
-                    fi
-                    info "  > Replacing existing link: $tgt"
-                    rm -f "$tgt"
-                else
-                    info "  > Backing up existing file/dir: $tgt"
-                    mv -f "$tgt" "${tgt}.bak"
-                fi
+        # Prepare target directory
+        mkdir -p "$(dirname "$tgt")"
+
+        # Handle existing target
+        if [[ -e "$tgt" || -L "$tgt" ]]; then
+            # If it's already a correct link, skip
+            if [[ -L "$tgt" ]] && [[ "$(readlink -f "$tgt")" == "$(readlink -f "$src")" ]]; then
+                continue
             fi
-
-            mkdir -p "$(dirname "$tgt")"
-            if ln -sf "$src" "$tgt"; then
-                info "  > Linked $src -> $tgt"
+            
+            # Backup if it's a real file
+            if [[ ! -L "$tgt" ]]; then
+                mv "$tgt" "${tgt}.bak"
+                info "Backed up existing $tgt to ${tgt}.bak"
             else
-                warn "  > Failed to link $src -> $tgt"
+                rm "$tgt"
             fi
+        fi
+
+        if ln -s "$src" "$tgt"; then
+            info "Linked $src -> $tgt"
         else
-            warn "  > Source missing: $src"
+            error "Failed to link $src"
         fi
     done
 }
 
-files
+link_files

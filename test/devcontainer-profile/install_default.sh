@@ -1,10 +1,8 @@
 #!/bin/bash
 set -e
-
-# Import test library
 source dev-container-features-test-lib
 
-check "apply.sh exists" ls /usr/local/share/devcontainer-profile/scripts/apply.sh
-check "plugins directory exists" ls /usr/local/share/devcontainer-profile/plugins/10-apt.sh
+check "script: apply.sh installed" test -x /usr/local/share/devcontainer-profile/scripts/apply.sh
+check "dir: plugins exist" test -d /usr/local/share/devcontainer-profile/plugins
 
 reportResults

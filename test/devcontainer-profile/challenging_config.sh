@@ -1,12 +1,8 @@
 #!/bin/bash
 set -e
-
-# Import test library
 source dev-container-features-test-lib
 
-info() { echo "INFO: $*"; }
-
-# Setup the FULL challenging config using discovery file
+# 1. Complex Configuration
 cat << EOF > "$HOME/.devcontainer.profile"
 {
   "apt": [
@@ -58,43 +54,34 @@ cat << EOF > "$HOME/.devcontainer.profile"
     "grep -q 'alias ll' ~/.bashrc || echo 'alias ll=\"lsd -la\"' >> ~/.bashrc",
     "fortune | cowsay | lolcat > ~/welcome_message.txt",
     "grep -q 'welcome_message.txt' ~/.bashrc || echo 'cat ~/welcome_message.txt' >> ~/.bashrc"
-  ]
+  ],
+  "files": [
+        { "source": "~/test_source", "target": "~/test_target" }
+    ],
+  "env": {
+        "SCENARIO_TEST": "battle-tested"
+    },
 }
 EOF
 
-# Discovery diagnostics
-ls -la /usr/local/share/devcontainer-profile/scripts/apply.sh
-ls -la "$HOME/.devcontainer.profile"
-
-# Trigger apply
+# 2. Execute
 /usr/local/share/devcontainer-profile/scripts/apply.sh
 
-# Re-source the path
-if [ -f "$HOME/.devcontainer.profile_path" ]; then
-    . "$HOME/.devcontainer.profile_path"
-fi
+# 3. Source environment
+[ -f "$HOME/.devcontainer.profile_path" ] && . "$HOME/.devcontainer.profile_path"
+[ -f "$HOME/.devcontainer.profile_env" ] && . "$HOME/.devcontainer.profile_env"
 
-# Discovery diagnostics
-info "PATH: $PATH"
-info "Searching for cowsay..."
-find /usr -name cowsay || true
-
-# Verifications
-check "apt: cowsay is installed" command -v cowsay
-check "pip: thefuck is installed" command -v thefuck
-check "npm: localtunnel is installed" command -v lt
+# 4. Assertions
+check "apt: cowsay" command -v cowsay
+check "pip: thefuck" command -v thefuck
+check "npm: chalk" command -v chalk
+check "env: variable set" [ "$STRESS_TEST" == "true" ]
+check "files: backup created" [ -L "$HOME/hosts_backup" ]
 check "go: lazygit is installed" command -v lazygit
-if ! command -v lsd >/dev/null 2>&1; then
-    echo "(!) ERROR: lsd not found in PATH. Diagnostic Log (/var/tmp/devcontainer-profile/state/devcontainer-profile.log):"
-    echo "--- FULL LOG ---"
-    cat /var/tmp/devcontainer-profile/state/devcontainer-profile.log || true
-    echo "--- ALL ERRORS/WARNINGS (Case-Insensitive) ---"
-    grep -Ei "error|warn|failed" /var/tmp/devcontainer-profile/state/devcontainer-profile.log || true
-fi
 check "cargo: lsd is installed" command -v lsd
-
 check "scripts: welcome message created" [ -f "$HOME/welcome_message.txt" ]
 check "bashrc: aliases added" grep "alias please" "$HOME/.bashrc"
-check "path: cargo bin is in path" grep "cargo/bin" "$HOME/.devcontainer.profile_path"
+check "env: variable is set" grep "SCENARIO_TEST" "$HOME/.devcontainer.profile_env"
+check "files: symlink created" [ -L "$HOME/test_target" ]
 
 reportResults

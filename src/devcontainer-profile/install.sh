@@ -1,72 +1,113 @@
-#!/bin/bash
+#!/usr/bin/env bash
+#
+# install.sh
+# entrypoint for the devcontainer feature build process
+#
+
 set -o errexit
 set -o pipefail
 set -o nounset
 
-readonly name="devcontainer-profile"
-echo ">>> [$name] Installing build-time components..."
+readonly NAME="devcontainer-profile"
+readonly INSTALL_DIR="/usr/local/share/devcontainer-profile"
+readonly BIN_DIR="/usr/local/bin"
 
-# Helper to check if a command exists
+log() { echo ">>> [${NAME}] $1"; }
+error() { echo "!!! [${NAME}] ERROR: $1" >&2; }
+
+# --- 1. Dependency Management ---
 check_cmd() { command -v "$1" >/dev/null 2>&1; }
 
-# Install dependencies if missing
-if ! check_cmd jq || ! check_cmd curl || ! check_cmd sudo || ! check_cmd unzip || ! check_cmd gpg; then
-    echo ">>> [$name] Installing missing dependencies (jq, curl, sudo, unzip, gpg)..."
-    export DEBIAN_FRONTEND=noninteractive
-    # We allow update to fail because some base images have broken third-party repos (like Yarn)
-    # that we don't depend on. We use '|| true' to be absolutely sure it doesn't trigger errexit.
-    apt-get update -y || true
+ensure_dependencies() {
+    local missing=()
+    for cmd in jq curl sudo unzip gpg; do
+        if ! check_cmd "$cmd"; then missing+=("$cmd"); fi
+    done
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        log "Installing build dependencies: ${missing[*]}"
+        export DEBIAN_FRONTEND=noninteractive
+        
+        # Resilient update: try update, but don't fail build if a 3rd party repo (irrelevant to us) is down
+        if ! apt-get update -y; then
+            echo "(!) Warning: apt-get update encountered errors, proceeding with cached lists..."
+        fi
+
+        if ! apt-get install -y --no-install-recommends "${missing[@]}"; then
+            error "Failed to install dependencies."
+            exit 1
+        fi
+    fi
+}
+
+# --- 2. Install Feature Installer ---
+install_feature_installer() {
+    log "Installing feature-installer..."
+    local installer_url="https://raw.githubusercontent.com/devcontainer-community/feature-installer/main/scripts/install.sh"
     
-    # Try to install, but don't fail the whole build if it fails (late-binding philosophy)
-    apt-get install -y jq curl ca-certificates sudo unzip gnupg || echo "(!) Warning: Dependency installation failed."
-fi
+    if ! curl -fsSL "$installer_url" | bash; then
+        error "Failed to download/install feature-installer."
+        exit 1
+    fi
 
-echo ">>> [$name] Installing feature-installer..."
-# We use -f for curl to fail on server errors, but we wrap in a check
-if ! curl -fsSL https://raw.githubusercontent.com/devcontainer-community/feature-installer/main/scripts/install.sh | bash; then
-    echo "(!) ERROR: Failed to install feature-installer. This is a fatal error."
-    exit 1
-fi
+    # Locate binary (root vs remote user paths can vary during build)
+    local possible_paths=(
+        "/root/.feature-installer/bin/feature-installer"
+        "/home/${_REMOTE_USER:-vscode}/.feature-installer/bin/feature-installer"
+    )
 
-# locate and move binary (Handle root vs non-root paths)
-INSTALLED_BIN=""
-REMOTE_USER="${_REMOTE_USER:-vscode}"
-if [ -f "/root/.feature-installer/bin/feature-installer" ]; then
-    INSTALLED_BIN="/root/.feature-installer/bin/feature-installer"
-elif [ -f "/home/${REMOTE_USER}/.feature-installer/bin/feature-installer" ]; then
-    INSTALLED_BIN="/home/${REMOTE_USER}/.feature-installer/bin/feature-installer"
-fi
+    local found_bin=""
+    for p in "${possible_paths[@]}"; do
+        if [ -f "$p" ]; then found_bin="$p"; break; fi
+    done
 
-if [ -n "$INSTALLED_BIN" ] && [ -f "$INSTALLED_BIN" ]; then
-    mv "$INSTALLED_BIN" "/usr/local/bin/feature-installer"
-    chmod +x "/usr/local/bin/feature-installer"
-fi
+    if [ -n "$found_bin" ]; then
+        mv "$found_bin" "${BIN_DIR}/feature-installer"
+        chmod +x "${BIN_DIR}/feature-installer"
+    fi
+}
 
-echo ">>> [$name] Deploying engine & plugins..."
+# --- 3. Deploy Assets ---
+deploy_assets() {
+    log "Deploying scripts and plugins..."
+    mkdir -p "${INSTALL_DIR}/scripts" "${INSTALL_DIR}/lib" "${INSTALL_DIR}/plugins"
+    mkdir -p "/var/tmp/devcontainer-profile/state"
 
-mkdir -p /usr/local/share/devcontainer-profile/scripts
-mkdir -p /usr/local/share/devcontainer-profile/plugins
-mkdir -p /var/tmp/devcontainer-profile/state
+    # Copy Library
+    if [ -f "./scripts/lib/utils.sh" ]; then
+        cp ./scripts/lib/utils.sh "${INSTALL_DIR}/lib/utils.sh"
+    else 
+        # Create it if it doesn't exist in source (helper for the refactor context)
+        mkdir -p "${INSTALL_DIR}/lib"
+        touch "${INSTALL_DIR}/lib/utils.sh"
+    fi
 
-if [ -f "./scripts/apply.sh" ]; then
-    cp ./scripts/apply.sh /usr/local/share/devcontainer-profile/scripts/apply.sh
-    chmod +x /usr/local/share/devcontainer-profile/scripts/apply.sh
-else
-    echo "(!) ERROR: scripts/apply.sh missing."
-    exit 1
-fi
+    # Copy Core Script
+    cp ./scripts/apply.sh "${INSTALL_DIR}/scripts/apply.sh"
+    chmod +x "${INSTALL_DIR}/scripts/apply.sh"
 
-if [ -d "./scripts/plugins" ]; then
-    cp ./scripts/plugins/*.sh /usr/local/share/devcontainer-profile/plugins/
-    chmod +x /usr/local/share/devcontainer-profile/plugins/*.sh
-else
-    echo "(!) ERROR: scripts/plugins directory missing."
-    exit 1
-fi
+    # Copy Plugins
+    if [ -d "./scripts/plugins" ]; then
+        cp ./scripts/plugins/*.sh "${INSTALL_DIR}/plugins/"
+        chmod +x "${INSTALL_DIR}/plugins/"*.sh
+    fi
+}
 
-if [ -n "${_REMOTE_USER}" ] && [ "${_REMOTE_USER}" != "root" ]; then
-    chown -R "${_REMOTE_USER}:${_REMOTE_USER}" /var/tmp/devcontainer-profile || true
-    chown -R "${_REMOTE_USER}:${_REMOTE_USER}" /usr/local/share/devcontainer-profile || true
-fi
+# --- 4. Permissions ---
+set_permissions() {
+    local target_user="${_REMOTE_USER:-vscode}"
+    if [ "$target_user" != "root" ]; then
+        # Ensure the temp directory is writable by the user
+        chown -R "$target_user:$target_user" /var/tmp/devcontainer-profile || true
+    fi
+}
 
-echo ">>> [$name] Installation complete."
+main() {
+    ensure_dependencies
+    install_feature_installer
+    deploy_assets
+    set_permissions
+    log "Installation complete."
+}
+
+main "$@"

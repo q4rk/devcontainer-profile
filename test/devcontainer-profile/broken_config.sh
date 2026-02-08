@@ -1,29 +1,33 @@
 #!/bin/bash
 set -e
-
-# Import test library
 source dev-container-features-test-lib
 
-# Run once to establish the managed link
-/usr/local/share/devcontainer-profile/scripts/apply.sh
+# 1. Setup invalid JSON
+# We use a mocked discovery path
+CONFIG_DIR="$HOME/.config/devcontainer-profile"
+mkdir -p "$CONFIG_DIR"
+echo '{ "invalid": "json", [broken_array] }' > "$CONFIG_DIR/config.json"
 
-# Inject invalid JSON into the managed path
-# We use sudo to ensure we can write to the volume-backed directory
-sudo bash -c "echo '{ \"invalid\": \"json\", [broken] }' > '$HOME/.devcontainer-profile/config.json'"
-
-# Trigger apply - it should NOT exit with non-zero
+# 2. Run Engine
+# It should NOT exit with error code (fail-soft philosophy), but it should log errors
+echo "Running engine with broken config..."
 if /usr/local/share/devcontainer-profile/scripts/apply.sh; then
-    check "engine: survived broken config" true
+    check "engine: exit code 0 on bad config" true
 else
-    check "engine: failed on broken config" false
+    check "engine: exit code 0 on bad config" false
 fi
 
-# Verify it didn't do anything crazy but the log shows issues
-# We check for either 'error' (from jq/tools) or 'failed' (from our warn helper)
-if grep -Ei "error|failed" /var/tmp/devcontainer-profile/state/devcontainer-profile.log; then
-    check "log: captures issues" true
+# 3. Verify Log
+LOG_FILE="/var/tmp/devcontainer-profile/state/devcontainer-profile.log"
+check "log: exists" [ -f "$LOG_FILE" ]
+
+# Check for jq errors or internal warnings
+if grep -Eiq "(parse error|jq:|failed)" "$LOG_FILE"; then
+    check "log: recorded parsing error" true
 else
-    check "log: captures issues" false
+    echo "Dumping Log:"
+    cat "$LOG_FILE"
+    check "log: recorded parsing error" false
 fi
 
 reportResults

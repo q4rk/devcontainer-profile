@@ -1,36 +1,36 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-vscode_settings() {
-    local settings_json
-    settings_json=$(jq -c '.["vscode-settings"] // empty' "${USER_CONFIG_PATH}")
+# Plugin: VS Code Settings
+# Merges user settings into Machine settings
 
-    [[ -z "${settings_json}" || "${settings_json}" == "null" ]] && return
+apply_settings() {
+    local settings
+    settings=$(jq -c '.["vscode-settings"] // empty' "${USER_CONFIG_PATH}")
+    [[ -z "$settings" ]] && return
 
     info "[VS Code] Applying machine settings..."
 
-    local server_paths=(
-        "${HOME}/.vscode-server/data/Machine"
-        "${HOME}/.vscode-server-insiders/data/Machine"
+    local paths=(
+        "$HOME/.vscode-server/data/Machine/settings.json"
+        "$HOME/.vscode-server-insiders/data/Machine/settings.json"
     )
 
-    for base_path in "${server_paths[@]}"; do
-        # We only apply if the directory exists (indicating that server version is in use)
-        if [[ -d "${base_path}" ]]; then
-            local target="${base_path}/settings.json"
-            
-            if [[ ! -f "${target}" ]]; then
-                echo "{}" > "${target}"
-            fi
+    for target in "${paths[@]}"; do
+        if [[ -d "$(dirname "$target")" ]]; then
+            # Create if missing
+            [[ ! -f "$target" ]] && echo "{}" > "$target"
 
-            # We use a temporary file to ensure we don't truncate the file on error
-            if tmp_settings=$(jq -s '.[0] * .[1]' "${target}" <(echo "${settings_json}") 2>/dev/null); then
-                echo "${tmp_settings}" > "${target}"
-                info "  > Applied to: $(basename $(dirname $(dirname "${base_path}")))"
+            # Merge safely using temp file
+            local tmp_out="${target}.tmp"
+            if jq -s '.[0] * .[1]' "$target" <(echo "$settings") > "$tmp_out"; then
+                mv "$tmp_out" "$target"
+                info "Updated settings at $target"
             else
-                warn "  > Failed to merge settings for ${base_path}"
+                rm -f "$tmp_out"
+                warn "Failed to merge settings for $target"
             fi
         fi
     done
 }
 
-vscode_settings
+apply_settings

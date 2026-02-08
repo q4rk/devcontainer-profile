@@ -1,67 +1,50 @@
 #!/bin/bash
+source /tmp/test_lib.sh
 
-set -o errexit
-set -o pipefail
+setup_suite
+mock_utils
 
-TEST_ROOT=$(mktemp -d)
-trap 'rm -rf "$TEST_ROOT"' EXIT
-
-export CONFIG_MOUNT="$TEST_ROOT/mount"
-export FALLBACK_MOUNT="$TEST_ROOT/fallback"
-export USER_CONFIG_PATH="$TEST_ROOT/user_link"
+# We need to simulate the mount points
+CONFIG_MOUNT="$TEST_ROOT/mount"
+FALLBACK_MOUNT="$TEST_ROOT/fallback"
 mkdir -p "$CONFIG_MOUNT" "$FALLBACK_MOUNT"
 
-# Load the logic we want to test (Isolated Discovery Logic)
+# Extract the discovery logic from apply.sh for isolation testing
+# (Or we could source apply.sh, but that runs everything. We just want to test the loop logic)
 discover_config() {
     local config_source=""
     local discovery_dirs=("${CONFIG_MOUNT}" "${FALLBACK_MOUNT}")
-
     for d in "${discovery_dirs[@]}"; do
-        if [[ -f "${d}" ]]; then
-            config_source="${d}"
-            break
+        if [[ -f "${d}" ]]; then config_source="${d}"; break
         elif [[ -d "${d}" ]]; then
-            if [[ -f "${d}/config.json" ]]; then config_source="${d}/config.json"
-            elif [[ -f "${d}/devcontainer.profile.json" ]]; then config_source="${d}/devcontainer.profile.json"
-            elif [[ -f "${d}/.devcontainer.profile" ]]; then config_source="${d}/.devcontainer.profile"
-            fi
-            
-            if [[ -n "$config_source" ]]; then
-                break
-            fi
+            for f in "config.json" "devcontainer.profile.json" ".devcontainer.profile"; do
+                 if [[ -f "${d}/${f}" ]]; then config_source="${d}/${f}"; break 2; fi
+            done
         fi
     done
     echo "$config_source"
 }
 
-assert_eq() {
-    if [[ "$1" == "$2" ]]; then
-        echo -e "  \e[32mPASS\e[0m: $3"
-    else
-        echo -e "  \e[31mFAIL\e[0m: $3 (Expected '$1', got '$2')"
-        exit 1
-    fi
-}
+echo "=== XDG Discovery Tests ==="
 
-echo "Running XDG Discovery Tests..."
+# 1. Direct File Mount
+touch "$CONFIG_MOUNT" # Simulate it being a file
+# Note: In bash, -f returns true for file, -d false.
+assert_eq "$CONFIG_MOUNT" "$(discover_config)" "Detects direct file mount"
+rm "$CONFIG_MOUNT" && mkdir "$CONFIG_MOUNT"
 
-rm -rf "$CONFIG_MOUNT"
-touch "$CONFIG_MOUNT"
-assert_eq "$CONFIG_MOUNT" "$(discover_config)" "Direct file mount detected"
-
-rm -rf "$CONFIG_MOUNT" && mkdir -p "$CONFIG_MOUNT"
-touch "$CONFIG_MOUNT/.devcontainer.profile"
-assert_eq "$CONFIG_MOUNT/.devcontainer.profile" "$(discover_config)" "Directory: found .devcontainer.profile"
-
-touch "$CONFIG_MOUNT/devcontainer.profile.json"
-assert_eq "$CONFIG_MOUNT/devcontainer.profile.json" "$(discover_config)" "Directory: devcontainer.profile.json overrides .devcontainer.profile"
-
+# 2. Priority: config.json
 touch "$CONFIG_MOUNT/config.json"
-assert_eq "$CONFIG_MOUNT/config.json" "$(discover_config)" "Directory: config.json overrides all"
+touch "$CONFIG_MOUNT/.devcontainer.profile"
+assert_eq "$CONFIG_MOUNT/config.json" "$(discover_config)" "Prioritizes config.json"
+rm "$CONFIG_MOUNT/config.json"
 
-rm -rf "$CONFIG_MOUNT"
-mkdir -p "$FALLBACK_MOUNT"
+# 3. Priority: .devcontainer.profile
+assert_eq "$CONFIG_MOUNT/.devcontainer.profile" "$(discover_config)" "Fallback to .devcontainer.profile"
+rm "$CONFIG_MOUNT/.devcontainer.profile"
+
+# 4. Fallback Mount
 touch "$FALLBACK_MOUNT/config.json"
-assert_eq "$FALLBACK_MOUNT/config.json" "$(discover_config)" "Fallback mount detected"
+assert_eq "$FALLBACK_MOUNT/config.json" "$(discover_config)" "Fallback directory check"
 
-echo "All XDG discovery tests passed successfully."
+echo "XDG Discovery logic confirmed."

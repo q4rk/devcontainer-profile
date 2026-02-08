@@ -1,72 +1,53 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-shell_history() {
-    local history_root="${WORKSPACE}/shellhistory"
+# Plugin: Shell History
+# Configures persistent shell history
 
-    # enabled by default
+configure_history() {
     local enabled
-    enabled=$(jq -r '.["shell-history"] // "true"' "${USER_CONFIG_PATH}" 2>/dev/null)
-    [[ "$enabled" == "false" ]] && return
+    enabled=$(get_config_value '.["shell-history"]' "true")
+    
+    if [[ "$enabled" == "false" ]]; then return; fi
 
-    # configurable history size (default to 10000)
-    local history_size
-    history_size=$(jq -r '.["shell-history-size"] // 10000' "${USER_CONFIG_PATH}" 2>/dev/null)
+    local size
+    size=$(get_config_value '.["shell-history-size"]' "10000")
+    local history_dir="${WORKSPACE}/shellhistory"
 
-    info "[Shell History] Activating persistence (size: ${history_size})..."
+    mkdir -p "${history_dir}"
+    ensure_root chown -R "$(id -u):$(id -g)" "${history_dir}"
 
-    mkdir -p "${history_root}"
-    if [[ "$(stat -c '%U' "${history_root}" 2>/dev/null)" != "$(id -un)" ]]; then
-        ensure_root chown -R "$(id -u):$(id -g)" "${history_root}" >/dev/null 2>&1 || true
-    fi
+    info "[Shell History] Persistence enabled (Size: $size)."
 
-    if [[ -f "$HOME/.bashrc" ]] && ! grep -q "HISTFILE=${history_root}/.bash_history" "$HOME/.bashrc"; then
-        cat << EOF >> "$HOME/.bashrc"
+    # Bash
+    local bash_snip="export HISTFILE=${history_dir}/.bash_history
+export HISTSIZE=${size}
+export HISTFILESIZE=${size}
+export PROMPT_COMMAND=\"\${PROMPT_COMMAND:+\$PROMPT_COMMAND; }history -a\""
+    
+    safe_append_if_missing "HISTFILE=${history_dir}/.bash_history" "$HOME/.bashrc" "$bash_snip"
 
-# .devcontainer.profile shell-history
-if [[ -z "\${HISTFILE_OLD-}" ]]; then
-    export HISTFILE_OLD=\$HISTFILE
-fi
-export HISTFILE=${history_root}/.bash_history
-export HISTSIZE=${history_size}
-export HISTFILESIZE=${history_size}
-# Append 'history -a' safely to existing PROMPT_COMMAND
-export PROMPT_COMMAND="\${PROMPT_COMMAND:+\$PROMPT_COMMAND; }history -a"
-EOF
-    fi
-
-    if [[ -f "$HOME/.zshrc" ]] && ! grep -q "HISTFILE=${history_root}/.zsh_history" "$HOME/.zshrc"; then
-        cat << EOF >> "$HOME/.zshrc"
-
-# .devcontainer.profile shell-history
-export HISTFILE=${history_root}/.zsh_history
-export HISTSIZE=${history_size}
-export SAVEHIST=${history_size}
+    # Zsh
+    local zsh_snip="export HISTFILE=${history_dir}/.zsh_history
+export HISTSIZE=${size}
+export SAVEHIST=${size}
 setopt APPEND_HISTORY
-setopt SHARE_HISTORY
-EOF
+setopt SHARE_HISTORY"
+
+    if [[ -f "$HOME/.zshrc" ]]; then
+        safe_append_if_missing "HISTFILE=${history_dir}/.zsh_history" "$HOME/.zshrc" "$zsh_snip"
     fi
 
+    # Fish
     if command -v fish >/dev/null 2>&1; then
         mkdir -p "$HOME/.config/fish"
-        local fish_config="$HOME/.config/fish/config.fish"
-        if ! grep -q "${history_root}/fish_history" "$fish_config" 2>/dev/null; then
-            cat << EOF >> "$fish_config"
-
-# .devcontainer.profile shell-history
-if [ -z "\$XDG_DATA_HOME" ];
-    set history_location ~/.local/share/fish/fish_history
-else
-    set history_location \$XDG_DATA_HOME/fish/fish_history
-end
-
-if [ -f \$history_location ] && [ ! -L \$history_location ];
-    mv \$history_location "\$history_location-old"
-end
-
-[ -L \$history_location ] || ln -fs ${history_root}/fish_history \$history_location
-EOF
+        local fish_target="$HOME/.local/share/fish/fish_history"
+        # Only link if it's not already linked to the right place
+        if [[ "$(readlink -f "$fish_target" 2>/dev/null)" != "${history_dir}/fish_history" ]]; then
+             mkdir -p "$(dirname "$fish_target")"
+             rm -rf "$fish_target"
+             ln -s "${history_dir}/fish_history" "$fish_target"
         fi
     fi
 }
 
-shell_history
+configure_history

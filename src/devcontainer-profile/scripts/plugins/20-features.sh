@@ -1,36 +1,44 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-oci_features() {
+# Plugin: Features
+# Installs OCI Features via feature-installer
+
+install_features() {
     if ! command -v feature-installer >/dev/null 2>&1; then return; fi
 
-    local features_json
-    features_json=$(jq -c '.features[]? | select(. != null)' "${USER_CONFIG_PATH}")
-    [[ -z "${features_json}" ]] && return
+    # Check if features exist
+    if [[ $(jq '.features | length' "${USER_CONFIG_PATH}") == "0" ]]; then return; fi
 
     info "[Features] Processing..."
-    
-    # We use a temporary directory for feature installation to avoid pollution
-    local temp_dir="${WORKSPACE}/tmp/features-$(date +%s)"
-    mkdir -p "$temp_dir"
 
-    echo "${features_json}" | while read -r feature; do
+    # Use a temp directory
+    local tmp_feat_dir="${WORKSPACE}/tmp/features-$$"
+    mkdir -p "$tmp_feat_dir"
+
+    # Iterate through features
+    # usage of base64 to handle complex json objects in loop
+    jq -r '.features[]? | @base64' "${USER_CONFIG_PATH}" | while read -r feat_b64; do
+        local feat_json
+        feat_json=$(echo "$feat_b64" | base64 -d)
+        
         local id
-        id=$(echo "$feature" | jq -r '.id')
+        id=$(echo "$feat_json" | jq -r '.id')
+        
+        # Parse options into array
+        local opts_args=()
+        while IFS="=" read -r key val; do
+            if [[ -n "$key" ]]; then
+                opts_args+=("--option" "${key}=${val}")
+            fi
+        done < <(echo "$feat_json" | jq -r '(.options // {}) | to_entries[] | .key + "=" + (.value | tostring)')
 
-        local options=()
-        while IFS= read -r line; do
-            [[ -z "$line" ]] && continue
-            options+=("--option" "$line")
-        done < <(echo "$feature" | jq -r '(.options // {}) | to_entries[] | .key + "=" + (.value | tostring)')
-
-        info "[Features] Installing: ${id}"
-
-        # Some features expect to be run as root
-        if ! TMPDIR="$temp_dir" ensure_root feature-installer feature install "$id" "${options[@]}" >>"${LOG_FILE}" 2>&1; then
-            error "[Features] Failed: ${id}"
+        info "[Features] Installing $id"
+        if ! TMPDIR="$tmp_feat_dir" ensure_root feature-installer feature install "$id" "${opts_args[@]}"; then
+            error "[Features] Failed to install $id"
         fi
     done
-    rm -rf "$temp_dir"
+
+    rm -rf "$tmp_feat_dir"
 }
 
-oci_features
+install_features

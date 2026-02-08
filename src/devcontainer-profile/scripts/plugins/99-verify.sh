@@ -1,33 +1,29 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-phase_verify() {
-    local commands=()
-    while IFS='' read -r line; do commands+=("$line"); done < <(
-        jq -r '.verify[]? // empty' "${USER_CONFIG_PATH}"
-    )
+# Plugin: Verify
+# Runs health checks
 
-    [[ ${#commands[@]} -eq 0 ]] && return
+run_verification() {
+    local checks
+    checks=$(jq -r '.verify[]? // empty' "${USER_CONFIG_PATH}")
+    [[ -z "$checks" ]] && return
 
     info "[Verify] Running health checks..."
     
-    local passed=0
     local failed=0
-
-    for cmd in "${commands[@]}"; do
-        info "  > Verifying: $cmd"
-        if ( eval "$cmd" ) >>"${LOG_FILE}" 2>&1; then
-            passed=$((passed + 1))
-        else
-            warn "  > FAILED: $cmd"
+    while read -r cmd; do
+        info " > Checking: $cmd"
+        if ! eval "$cmd" >>"${LOG_FILE}" 2>&1; then
+            error "Check failed: $cmd"
             failed=$((failed + 1))
         fi
-    done
+    done <<< "$checks"
 
-    info "[Verify] Report: ${passed} passed, ${failed} failed."
-    
     if [[ $failed -gt 0 ]]; then
-        warn "Some personalization checks failed. Check the logs for details."
+        warn "$failed checks failed. See ${LOG_FILE} for details."
+    else
+        info "All checks passed."
     fi
 }
 
-phase_verify
+run_verification

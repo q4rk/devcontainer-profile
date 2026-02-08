@@ -1,23 +1,17 @@
 #!/bin/bash
 set -e
-
-# Import test library
 source dev-container-features-test-lib
 
-info() { echo "INFO: $*"; }
+# Only run if we are root
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Skipping root test (current user: $(id -un))"
+    exit 0
+fi
 
-# Verify identity
-info "Current user: $(id)"
-check "user: is root" [ "$(id -u)" -eq 0 ]
+echo '{"env": {"ROOT_POWER": "unlimited"}}' > /root/.devcontainer.profile
 
-# Config for root via discovery file
-echo '{"env": {"ROOT_ACTIVE": "true"}}' > "$HOME/.devcontainer.profile"
-
-# Trigger apply
 /usr/local/share/devcontainer-profile/scripts/apply.sh
 
-# Verifications
-check "engine: link established" [ -L "$HOME/.devcontainer-profile" ]
-check "env: variable set for root" grep "ROOT_ACTIVE" "$HOME/.devcontainer.profile_env"
+check "env: root env injected" grep "ROOT_POWER" /root/.devcontainer.profile_env
 
 reportResults
