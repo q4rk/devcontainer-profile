@@ -8,7 +8,7 @@ run_apt() {
     local packages=()
     while IFS='' read -r line; do 
         [[ -n "$line" ]] && packages+=("$line")
-    done < <(jq -r '.apt[]? | if type=="string" then . else .name end' "${USER_CONFIG_PATH}" 2>/dev/null)
+    done < <(jq -r '.apt[]? | if type=="string" then . else .name + (if .version then "=\(.version)" else "" end) end' "${USER_CONFIG_PATH}" 2>/dev/null)
 
     [[ ${#packages[@]} -eq 0 ]] && return 0
 

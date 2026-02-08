@@ -8,6 +8,9 @@ trap teardown_hermetic_env EXIT
 
 echo "=== [Unit] XDG Discovery Tests ==="
 
+# Mock sudo
+mock_tool "sudo"
+
 # Helper to run discovery only (we source the script function if possible, 
 # or run the script and check what file ends up in VOLUME_CONFIG_DIR)
 

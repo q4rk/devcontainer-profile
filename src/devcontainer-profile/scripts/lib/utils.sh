@@ -8,7 +8,17 @@ log() {
     local message="$3"
     local timestamp
     timestamp=$(date +'%Y-%m-%dT%H:%M:%S')
-    echo "[${timestamp}] [${level}] [${category}] ${message}"
+    local msg="[${timestamp}] [${level}] [${category}] ${message}"
+    
+    echo "${msg}"
+    
+    # Mirror to log file if it exists and is writable
+    if [[ -n "${LOG_FILE:-}" ]]; then
+        # Ensure directory exists (cheap check)
+        if [[ -d "$(dirname "${LOG_FILE}")" ]]; then
+            echo "${msg}" >> "${LOG_FILE}" 2>/dev/null || true
+        fi
+    fi
 }
 
 info() { log "INFO" "$1" "$2"; }
@@ -17,10 +27,15 @@ error() { log "ERROR" "$1" "$2" >&2; } # Echo error to stderr as well
 
 # --- User & Context ---
 detect_user_context() {
-    export TARGET_USER="${_REMOTE_USER:-$(id -un)}"
-    export TARGET_HOME
-    TARGET_HOME=$(getent passwd "${TARGET_USER}" | cut -d: -f6)
-    export TARGET_HOME="${TARGET_HOME:-$HOME}"
+    export TARGET_USER="${TARGET_USER:-${_REMOTE_USER:-$(id -un)}}"
+    
+    if [[ -z "${TARGET_HOME:-}" ]]; then
+        local user_home
+        user_home=$(getent passwd "${TARGET_USER}" | cut -d: -f6)
+        export TARGET_HOME="${user_home:-$HOME}"
+    else
+        export TARGET_HOME
+    fi
     
     # Managed paths
     export MANAGED_CONFIG_DIR="${TARGET_HOME}/.devcontainer-profile"

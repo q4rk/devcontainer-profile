@@ -9,16 +9,9 @@ trap teardown_hermetic_env EXIT
 echo "=== [Unit] Plugin Integration Tests ==="
 
 # Mock the entire toolchain
-for tool in apt-get pip3 npm go cargo code feature-installer git; do
+for tool in sudo apt-get pip pip3 npm go cargo code feature-installer git; do
     mock_tool "$tool"
 done
-
-# Mock 'sudo' to just run the command
-cat <<EOF > "$MOCK_BIN/sudo"
-#!/bin/bash
-"\$@"
-EOF
-chmod +x "$MOCK_BIN/sudo"
 
 # --- Scenario: The Kitchen Sink Config ---
 # We write a complex config and verify the specific commands generated.
@@ -54,7 +47,7 @@ echo "--- Verifying APT ---"
 assert_audit_call "apt-get" 'any(. == "simple-tool") and any(. == "complex-tool=1.0")'
 
 echo "--- Verifying Languages ---"
-assert_audit_call "pip3" 'contains(["install", "black==20.0"])'
+assert_audit_call "pip" 'contains(["install", "black==20.0"])'
 assert_audit_call "npm" 'contains(["install", "-g", "prettier"])'
 assert_audit_call "go" 'contains(["install", "gopls@latest"])'
 assert_audit_call "cargo" 'contains(["install", "ripgrep"])'

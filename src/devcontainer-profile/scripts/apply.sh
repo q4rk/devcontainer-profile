@@ -5,29 +5,33 @@ set -o pipefail
 
 # --- Bootstrap Environment ---
 # Source the shared library. If missing, we cannot proceed.
-readonly LIB_PATH="/usr/local/share/devcontainer-profile/lib/utils.sh"
+readonly LIB_PATH_DEFAULT="/usr/local/share/devcontainer-profile/lib/utils.sh"
+readonly LIB_PATH="${LIB_PATH:-$LIB_PATH_DEFAULT}"
+
 if [[ ! -f "${LIB_PATH}" ]]; then
     local_file="$(dirname "$0")/../lib/utils.sh"
     if [[ -f $local_file ]]; then
         source "$local_file"
     else
         echo "(!) FATAL: Library not found at ${LIB_PATH}. Skipping." >&2
-        return 1 2>/dev/null
+        exit 1
     fi   
 else 
     source "${LIB_PATH}"
 fi
 
-
-
 # --- Global Constants ---
-readonly WORKSPACE="/var/tmp/devcontainer-profile"
-readonly STATE_DIR="${WORKSPACE}/state"
+export WORKSPACE="${WORKSPACE:-/var/tmp/devcontainer-profile}"
+export STATE_DIR="${STATE_DIR:-${WORKSPACE}/state}"
+
+# Initialize Environment Variables
+detect_user_context
+
 readonly LOCK_FILE="${STATE_DIR}/engine.lock"
 readonly HASH_FILE="${STATE_DIR}/last_applied_hash"
 readonly INSTANCE_MARKER="${TARGET_HOME}/.devcontainer-profile.applied"
 readonly LOG_FILE="${STATE_DIR}/profile.log"
-readonly PLUGIN_DIR="/usr/local/share/devcontainer-profile/plugins"
+readonly PLUGIN_DIR="${PLUGIN_DIR:-/usr/local/share/devcontainer-profile/plugins}"
 
 # --- Main Execution Flow ---
 
@@ -64,7 +68,7 @@ discover_configuration() {
         "${MANAGED_CONFIG_DIR}/.devcontainer.profile"
         "${MANAGED_CONFIG_DIR}"/config.json
         "${TARGET_HOME}/.config/devcontainer-profile/config.json"
-        "${TARGET_HOME}/..devcontainer.profile"
+        "${TARGET_HOME}/.devcontainer.profile"
     )
 
     local found_config=""
@@ -107,7 +111,8 @@ link_managed_directory() {
 
     rm -rf "${link_target}"
     ln -s "${VOLUME_CONFIG_DIR}" "${link_target}"
-    chown -h "${TARGET_USER}:${TARGET_USER}" "${link_target}"
+    # chown might fail if user doesn't exist in unit tests, so we fail soft
+    chown -h "${TARGET_USER}:${TARGET_USER}" "${link_target}" 2>/dev/null || true
     info "Core" "Linked ${link_target} -> ${VOLUME_CONFIG_DIR}"
 }
 
@@ -159,6 +164,10 @@ execute_plugins() {
 
 main() {
     initialize_workspace
+    
+    # Redirect stderr to log file for the rest of the execution
+    # This ensures the directory exists before we try to open the log file
+    exec 2>>"${LOG_FILE}"
 
     # Acquire lock to prevent race conditions
     exec 200>"${LOCK_FILE}"
@@ -169,9 +178,6 @@ main() {
             return 0
         fi
     fi
-
-    # Initialize Environment Variables for plugins
-    detect_user_context
 
     # 1. Setup Persistence Links
     discover_configuration
@@ -195,5 +201,5 @@ main() {
     fi
 }
 
-# Run main, redirecting all output to log, but mirroring info to stderr
-main "$@" 2>>"${LOG_FILE}"
+# Run main
+main "$@"

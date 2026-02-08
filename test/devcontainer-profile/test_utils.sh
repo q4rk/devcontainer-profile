@@ -42,6 +42,9 @@ setup_hermetic_env() {
     cp "$REPO_ROOT/scripts/lib/utils.sh" "$INSTALL_DIR/lib/"
     cp "$REPO_ROOT/scripts/plugins/"*.sh "$INSTALL_DIR/plugins/"
     
+    chmod +x "$INSTALL_DIR/scripts/apply.sh"
+    chmod +x "$INSTALL_DIR/plugins/"*.sh
+    
     # Point the engine to our sandboxed library
     export LIB_PATH="$INSTALL_DIR/lib/utils.sh"
     export PLUGIN_DIR="$INSTALL_DIR/plugins"
@@ -79,6 +82,13 @@ JSON
 
 # If special behavior is needed, add it here
 if [[ "$name" == "sudo" ]]; then
+    while [[ "\$1" == -* ]]; do
+        if [[ "\$1" == "-u" ]]; then
+            shift 2
+        else
+            shift 1
+        fi
+    done
     "\$@"
 fi
 EOF

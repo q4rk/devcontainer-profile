@@ -11,7 +11,7 @@ echo "=== [Unit] Engine Core Logic Tests ==="
 
 # Mock dependencies
 mock_tool "sudo"
-mock_tool "md5sum" # We will rely on real md5sum usually, but strict mocking is safer for unit
+# We will rely on real md5sum
 # Override simple mocks with specific behavior if needed, or rely on system tools for logic
 # For logic tests, we actually want REAL coreutils (md5sum, ln, cp) to test the script's logic.
 # We only mock heavy lifters like apt/git.
