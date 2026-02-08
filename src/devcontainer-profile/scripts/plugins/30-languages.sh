@@ -86,7 +86,8 @@ install_pip() {
     fi
     
     if [[ -n "$pip_bin" ]]; then
-        info "Pip" "Installing packages using '$raw_bin_name'..."
+        mapfile -t pkg_array <<< "$packages"
+        info "Pip" "Installing packages using '$raw_bin_name': ${pkg_array[*]}"
         local args=("install" "--user" "--upgrade")
         if "$pip_bin" install --help 2>&1 | grep -q "break-system-packages"; then
             args+=("--break-system-packages")
@@ -109,8 +110,8 @@ install_npm() {
     npm_bin=$(resolve_binary "$raw_bin_name")
 
     if [[ -n "$npm_bin" ]]; then
-        info "Npm" "Installing global packages using '$raw_bin_name'..."
         mapfile -t pkg_array <<< "$packages"
+        info "Npm" "Installing global packages using '$raw_bin_name': ${pkg_array[*]}"
         
         # Try global install without sudo first (common for NVM/user nodes)
         if ! "$npm_bin" install -g "${pkg_array[@]}"; then
@@ -137,8 +138,8 @@ install_gem() {
     local gem_bin; gem_bin=$(resolve_binary "$raw_bin_name")
 
     if [[ -n "$gem_bin" ]]; then
-        info "Gem" "Installing packages using '$raw_bin_name'..."
         mapfile -t pkg_array <<< "$packages"
+        info "Gem" "Installing packages using '$raw_bin_name': ${pkg_array[*]}"
         
         # Try user-level install first
         if ! "$gem_bin" install --user-install --no-document "${pkg_array[@]}"; then
@@ -167,12 +168,13 @@ install_go() {
     go_bin=$(resolve_binary "$raw_bin_name")
 
     if [[ -n "$go_bin" ]]; then
-        info "Go" "Installing tools using '$raw_bin_name'..."
-        while IFS= read -r pkg; do
+        mapfile -t pkg_array <<< "$packages"
+        info "Go" "Installing tools using '$raw_bin_name': ${pkg_array[*]}"
+        for pkg in "${pkg_array[@]}"; do
              [[ -z "$pkg" ]] && continue
              [[ "$pkg" != *"@"* ]] && pkg="${pkg}@latest"
              "$go_bin" install "$pkg" || warn "Go" "Failed: $pkg"
-        done <<< "$packages"
+        done
     else
         warn "Go" "Binary '$raw_bin_name' not found. Skipping."
     fi
@@ -190,7 +192,8 @@ install_cargo() {
     cargo_bin=$(resolve_binary "$raw_bin_name")
 
     if [[ -n "$cargo_bin" ]]; then
-        info "Cargo" "Installing crates using '$raw_bin_name'..."
+        mapfile -t pkg_array <<< "$packages"
+        info "Cargo" "Installing crates using '$raw_bin_name': ${pkg_array[*]}"
         
         if command -v rustup >/dev/null 2>&1; then
             if ! rustup default >/dev/null 2>&1; then
@@ -202,10 +205,10 @@ install_cargo() {
         # Update registry index once
         "$cargo_bin" search --limit 1 verify-network >/dev/null 2>&1 || true
 
-        while IFS= read -r pkg; do
+        for pkg in "${pkg_array[@]}"; do
             [[ -z "$pkg" ]] && continue
             "$cargo_bin" install "$pkg" || warn "Cargo" "Failed: $pkg"
-        done <<< "$packages"
+        done
     else
         warn "Cargo" "Binary '$raw_bin_name' not found. Skipping."
     fi
