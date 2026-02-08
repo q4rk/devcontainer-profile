@@ -12,8 +12,8 @@ show_logs() {
 trap show_logs EXIT
 
 # 1. Inject Invalid JSON
-mkdir -p "$HOME/.devcontainer-profile"
-echo '{ "invalid": "json", broken_comma, }' > "$HOME/.devcontainer-profile/config.json"
+mkdir -p "$HOME/.devcontainer.profile"
+echo '{ "invalid": "json", broken_comma, }' > "$HOME/.devcontainer.profile/config.json"
 
 # 2. Run Engine (Should NOT exit 1)
 if /usr/local/share/devcontainer-profile/scripts/apply.sh; then

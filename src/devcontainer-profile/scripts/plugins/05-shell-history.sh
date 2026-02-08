@@ -14,7 +14,7 @@ run_history() {
     info "History" "Configuring persistence (size: ${history_size})..."
     
     mkdir -p "${history_root}"
-    ensure_root chown -R "${TARGET_USER}:${TARGET_USER}" "${history_root}"
+    ensure_root chown -R "${TARGET_USER}:$(id -gn "${TARGET_USER}")" "${history_root}"
 
     # Bash Configuration
     local bash_config="

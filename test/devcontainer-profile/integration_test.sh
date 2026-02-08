@@ -11,8 +11,10 @@ show_logs() {
 }
 trap show_logs EXIT
 
-# 1. Configuration matching engine capabilities
-cat << EOF > "$HOME/.devcontainer.profile"
+# 1. Complex Configuration
+# Create the directory first as it's now our managed path
+mkdir -p "$HOME/.devcontainer.profile"
+cat << EOF > "$HOME/.devcontainer.profile/config.json"
 {
   "apt": [
     "cowsay",

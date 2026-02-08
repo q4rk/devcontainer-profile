@@ -20,7 +20,7 @@ setup_hermetic_env() {
     export AUDIT_LOG="$TEST_ROOT/audit.json"
     
     # Engine specific vars
-    export TARGET_USER="vscode"
+    export TARGET_USER="$(id -un)"
     export TARGET_HOME="$HOME"
     export MANAGED_CONFIG_DIR="$HOME/.devcontainer-profile"
     export VOLUME_CONFIG_DIR="$STATE_DIR/configs"

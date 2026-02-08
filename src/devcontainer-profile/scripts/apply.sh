@@ -65,10 +65,12 @@ discover_configuration() {
         "${WORKSPACE}/.config/.devcontainer-profile/devcontainer.profile.json"
         "${WORKSPACE}/.config/.devcontainer-profile/.devcontainer.profile"
         "/etc/user-host-config/devcontainer-profile/config.json"
+        "${MANAGED_CONFIG_DIR}/config.json"
+        "${MANAGED_CONFIG_DIR}/devcontainer.profile.json"
         "${MANAGED_CONFIG_DIR}/.devcontainer.profile"
-        "${MANAGED_CONFIG_DIR}"/config.json
         "${TARGET_HOME}/.config/devcontainer-profile/config.json"
-        "${TARGET_HOME}/.devcontainer.profile"
+        "${TARGET_HOME}/.config/devcontainer-profile/devcontainer.profile.json"
+        "${TARGET_HOME}/.config/devcontainer-profile/.devcontainer.profile"
     )
 
     local found_config=""
@@ -83,7 +85,7 @@ discover_configuration() {
         info "Core" "Ingesting configuration: ${found_config}"
         ensure_root mkdir -p "${VOLUME_CONFIG_DIR}"
         ensure_root cp -L "${found_config}" "${VOLUME_CONFIG_DIR}/config.json"
-        ensure_root chown "${TARGET_USER}:${TARGET_USER}" "${VOLUME_CONFIG_DIR}/config.json"
+        ensure_root chown "${TARGET_USER}:$(id -gn "${TARGET_USER}")" "${VOLUME_CONFIG_DIR}/config.json"
     else
         info "Core" "No configuration found. Engine will stand by."
         return 1
@@ -112,7 +114,7 @@ link_managed_directory() {
     rm -rf "${link_target}"
     ln -s "${VOLUME_CONFIG_DIR}" "${link_target}"
     # chown might fail if user doesn't exist in unit tests, so we fail soft
-    chown -h "${TARGET_USER}:${TARGET_USER}" "${link_target}" 2>/dev/null || true
+    chown -h "${TARGET_USER}:$(id -gn "${TARGET_USER}")" "${link_target}" 2>/dev/null || true
     info "Core" "Linked ${link_target} -> ${VOLUME_CONFIG_DIR}"
 }
 
@@ -198,7 +200,7 @@ main() {
             mv "${HASH_FILE}.new" "${HASH_FILE}"
         fi
         touch "${INSTANCE_MARKER}"
-        ensure_root chown "${TARGET_USER}:${TARGET_USER}" "${INSTANCE_MARKER}"
+        ensure_root chown "${TARGET_USER}:$(id -gn "${TARGET_USER}")" "${INSTANCE_MARKER}"
         info "Core" "Profile applied successfully."
     else
         info "Core" "No changes detected. Skipping."

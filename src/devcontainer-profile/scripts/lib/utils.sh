@@ -43,7 +43,7 @@ detect_user_context() {
     fi
     
     # Managed paths
-    export MANAGED_CONFIG_DIR="${TARGET_HOME}/.devcontainer-profile"
+    export MANAGED_CONFIG_DIR="${TARGET_HOME}/.devcontainer.profile"
     export VOLUME_CONFIG_DIR="${STATE_DIR}/configs"
     export USER_CONFIG_PATH="${VOLUME_CONFIG_DIR}/config.json"
 }
@@ -54,9 +54,9 @@ ensure_root() {
         "$@"
     else
         if command -v sudo >/dev/null 2>&1; then
-            # -n: non-interactive (fail if password needed)
-            # -E: preserve env
-            sudo -n -E "$@"
+            # -n: non-interactive
+            # We avoid -E to prevent HOME mismatch errors (e.g. rustup)
+            sudo -n "$@"
         else
             warn "System" "sudo not available and not root. Command may fail: $*"
             "$@"

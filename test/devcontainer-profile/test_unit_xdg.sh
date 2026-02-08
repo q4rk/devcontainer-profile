@@ -27,10 +27,11 @@ run_discovery() {
 }
 
 # 1. Test: Implicit Config (baked in image)
-echo '{"test": "test-baked"}' > "$HOME/.devcontainer.profile"
+mkdir -p "$HOME/.devcontainer.profile"
+echo '{"test": "test-baked"}' > "$HOME/.devcontainer.profile/config.json"
 run_discovery
 if grep -q "test-baked" "$VOLUME_CONFIG_DIR/config.json"; then
-    log_pass "Found ~/.devcontainer.profile"
+    log_pass "Found ~/.devcontainer.profile/config.json"
 else
     log_fail "Failed to find home directory config"
 fi
