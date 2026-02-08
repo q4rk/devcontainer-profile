@@ -50,7 +50,8 @@ cat << EOF > "$HOME/.devcontainer.profile"
   ],
   "features": [
     { "id": "ghcr.io/devcontainers/features/aws-cli:1" },
-    { "id": "ghcr.io/devcontainers/features/terraform:1" }
+    { "id": "ghcr.io/devcontainers/features/terraform:1" },
+    {"id": "ghcr.io/devcontainers/features/rust:1"}
   ],
   "scripts": [
     "grep -q 'alias please' ~/.bashrc || echo 'alias please=\"sudo\"' >> ~/.bashrc",
