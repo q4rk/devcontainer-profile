@@ -4,15 +4,12 @@
   "name": "Dev Container Personal Profile",
   "description": "Late-binds personal settings, dotfiles, and tools from a config file.",
   "installsAfter": [
-    "ghcr.io/devcontainers/features/common-utils",
-    "ghcr.io/devcontainers/features/nix",
-    "ghcr.io/devcontainers/features/python",
-    "ghcr.io/devcontainers/features/node"
+    "ghcr.io/devcontainers/features/common-utils"
   ],
   "mounts": [
     {
       "source": "${devcontainerId}-profile-state",
-      "target": "/var/lib/devcontainer-profile",
+      "target": "/var/tmp/devcontainer-profile",
       "type": "volume"
     }
   ],
