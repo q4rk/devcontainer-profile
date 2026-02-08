@@ -111,7 +111,19 @@ install_npm() {
     if [[ -n "$npm_bin" ]]; then
         info "Npm" "Installing global packages using '$raw_bin_name'..."
         mapfile -t pkg_array <<< "$packages"
-        ensure_root "$npm_bin" install -g "${pkg_array[@]}" || warn "Npm" "Installation failed"
+        
+        # Try global install without sudo first (common for NVM/user nodes)
+        if ! "$npm_bin" install -g "${pkg_array[@]}"; then
+             # Fallback to root if needed
+             ensure_root "$npm_bin" install -g "${pkg_array[@]}" || warn "Npm" "Installation failed"
+        fi
+
+        # Dynamically add npm global bin to PATH for current session
+        local npm_prefix
+        npm_prefix=$("$npm_bin" config get prefix 2>/dev/null)
+        if [[ -d "${npm_prefix}/bin" ]]; then
+            case ":$PATH:" in *":${npm_prefix}/bin:"*) ;; *) export PATH="$PATH:${npm_prefix}/bin" ;; esac
+        fi
     else
         warn "Npm" "Binary '$raw_bin_name' not found. Skipping."
     fi
