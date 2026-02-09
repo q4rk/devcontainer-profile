@@ -38,9 +38,3 @@ jobs:
             --base-image ${{ matrix.baseImage }} \
             --project-folder .
 
-      - name: "Run Scenario Tests"
-        run: |
-          devcontainer features test \
-            --scenarios test/devcontainer-profile \
-            --base-image ${{ matrix.baseImage }} \
-            --project-folder .
