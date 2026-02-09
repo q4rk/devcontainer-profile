@@ -5,7 +5,6 @@ This repo is a collection of dev container features. Follow the links below for 
 |Feature||
 |---|---|
 |[devcontainer.profile](./src/devcontainer-profile)|Late-binds personal settings (tools, dotfiles, settings) from `~/.devcontainer.profile` to a container at runtime without modifying the project's shared `devcontainer.json`. ([code.claude.com](https://code.claude.com))|
-|
 
 # Issues
 
