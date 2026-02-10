@@ -25,19 +25,24 @@ The **.devcontainer.profile** feature is a decoupled customization engine for De
 *   **Solid Persistence:** Uses a dedicated Docker volume and a **Solid Directory Link** (`~/.devcontainer.profile/`). Any file operations (creation, replacement, deletion) performed inside this directory in the container are immediately reflected in the persistent volume and survive rebuilds.
 *   **Fail-Soft & Self-Healing:** The engine is designed to never crash the container build. It atomizes plugin execution and automatically restores the persistent link on every run if it is missing or broken.
 
+## Commands
+*   `edit-profile`: Opens your personal configuration file (`~/.devcontainer.profile/config.json`) in VS Code or your default editor.
+*   `apply-profile`: Applies the current configuration. Installs tools, links dotfiles, and updates settings.
+*   `apply-profile --force`: Forces the application, breaking any stale locks.
+
 ## Quick Start
 
-### 2. Start & Configure
-Rebuild your Dev Container. Once inside, create your configuration file:
+### 1. Start & Configure
+After adding the feature to your `devcontainer.json`. Rebuild your Dev Container. Once inside, create your configuration file:
 
 ```bash
 # The directory is automatically created and linked to a persistent volume
-nano ~/.devcontainer.profile/config.json
+edit-profile
 ```
 
-Paste your configuration (see example below).
+Paste your configuration [see example below](./README.md#example-configjson).
 
-### 3. Apply
+### 2. Apply
 Apply your changes immediately:
 
 ```bash
