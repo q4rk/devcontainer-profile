@@ -12,17 +12,17 @@ The **.devcontainer.profile** feature is a decoupled customization engine for De
 
 ## Quick Start
 
-### 2. Start & Configure
-Rebuild your Dev Container. Once inside, create your configuration file:
+### 1. Start & Configure
+After adding the feature to your `devcontainer.json`. Rebuild your Dev Container. Once inside, create your configuration file:
 
 ```bash
 # The directory is automatically created and linked to a persistent volume
-nano ~/.devcontainer.profile/config.json
+edit-profile
 ```
 
-Paste your configuration (see example below).
+Paste your configuration [see example below](./README.md#example-configjson).
 
-### 3. Apply
+### 2. Apply
 Apply your changes immediately:
 
 ```bash
