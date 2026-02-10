@@ -1,6 +1,6 @@
 {
   "id": "devcontainer-profile",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "keywords": ["profile", "persistence", "history", "debian"],
   "name": "Dev Container Profile",
   "description": "Late-binds personal settings, dotfiles, and tools from a config file.",
