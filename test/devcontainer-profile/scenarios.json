@@ -1,0 +1,23 @@
+{
+    "install_default": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "features": { "devcontainer-profile": {} }
+    },
+    "broken_config": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "features": { "devcontainer-profile": {} }
+    },
+    "complex_config": {
+        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "features": { "devcontainer-profile": {} }
+    },
+    "root_user": {
+        "image": "mcr.microsoft.com/devcontainers/base:debian",
+        "remoteUser": "root",
+        "features": { "devcontainer-profile": {} }
+    },
+    "integration_test": {
+        "image": "mcr.microsoft.com/devcontainers/universal:2",
+        "features": { "devcontainer-profile": {} }
+    }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "devcontainer-profile",
+  "version": "0.1.0",
+  "keywords": ["profile", "persistence", "history", "debian"],
+  "name": "Dev Container Profile",
+  "description": "Late-binds personal settings, dotfiles, and tools from a config file.",
+  "options": {
+    "allowSudo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Allow the feature to configure passwordless sudo for the non-root user. Makes package installation easier"
+    },
+    "restoreOnCreate": {
+      "type": "boolean",
+      "default": true,
+      "description": "Automatically apply the profile when the container is created. Defaults to true."
+    }
+  },
+  "mounts": [
+    {
+      "source": "${devcontainerId}-profile-state",
+      "target": "/var/tmp/devcontainer-profile",
+      "type": "volume"
+    }
+  ],
+  "onCreateCommand": "/usr/local/share/devcontainer-profile/scripts/apply.sh --restore-if-enabled --force"
+}
+
+
