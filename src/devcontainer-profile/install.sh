@@ -124,11 +124,40 @@ deploy_assets() {
 
 apply_alias() {
     echo ">>> [${FEATURE_NAME}] Creating 'apply-profile' symlink..."
-    # Create a symlink in /usr/local/bin so it's in the PATH also create a namespaced alias for clarity
+    # Create a symlink in /usr/local/bin so it's in the PATH
     ln -sf "${INSTALL_DIR}/scripts/apply.sh" "${BIN_DIR}/apply-profile"
     chmod +x "${BIN_DIR}/apply-profile"
+    
+    # Also create a namespaced alias for clarity
     ln -sf "${INSTALL_DIR}/scripts/apply.sh" "${BIN_DIR}/devcontainer-profile-apply"
     chmod +x "${BIN_DIR}/devcontainer-profile-apply"
+}
+
+install_edit_helper() {
+    echo ">>> [${FEATURE_NAME}] Creating 'edit-profile' helper..."
+    cat <<'EOF' > "${BIN_DIR}/edit-profile"
+#!/bin/bash
+# Use the discovered config path if available, otherwise fallback to canonical volume path
+CONFIG_FILE="${DEVCONTAINER_PROFILE_CONFIG:-/var/tmp/devcontainer-profile/state/configs/config.json}"
+
+# Ensure directory exists (in case engine hasn't run yet)
+mkdir -p "$(dirname "$CONFIG_FILE")"
+
+# Create default if missing
+if [ ! -f "$CONFIG_FILE" ]; then echo '{"apt":[]}' > "$CONFIG_FILE"; fi
+
+if command -v code >/dev/null 2>&1; then
+    code -r "$CONFIG_FILE"
+elif [ -n "$EDITOR" ]; then
+    "$EDITOR" "$CONFIG_FILE"
+else
+    nano "$CONFIG_FILE"
+fi
+EOF
+    chmod +x "${BIN_DIR}/edit-profile"
+    
+    # Namespaced alias
+    ln -sf "${BIN_DIR}/edit-profile" "${BIN_DIR}/devcontainer-profile-edit"
 }
 
 persist_feature_config
@@ -137,5 +166,6 @@ install_feature_installer
 configure_sudo_and_user
 deploy_assets
 apply_alias
+install_edit_helper
 
 echo ">>> [${FEATURE_NAME}] Build-time installation complete."

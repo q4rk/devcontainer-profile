@@ -71,6 +71,11 @@ discover_configuration() {
         ensure_root mkdir -p "${VOLUME_CONFIG_DIR}"
         ensure_root cp -L "${found_config}" "${VOLUME_CONFIG_DIR}/config.json"
         safe_chown "${TARGET_USER}" "${VOLUME_CONFIG_DIR}/config.json"
+        
+        # Persist the config location for helper tools
+        local env_export="export DEVCONTAINER_PROFILE_CONFIG=\"${VOLUME_CONFIG_DIR}/config.json\""
+        update_file_idempotent "${TARGET_HOME}/.bashrc" "PROFILE_CONFIG_PATH" "$env_export"
+        update_file_idempotent "${TARGET_HOME}/.zshrc" "PROFILE_CONFIG_PATH" "$env_export"
     else
         info "Core" "No configuration found. Engine will stand by."
         return 1
