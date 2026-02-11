@@ -27,6 +27,7 @@ The **.devcontainer.profile** feature is a decoupled customization engine for De
 
 ## Commands
 *   `edit-profile`: Opens your personal configuration file (`~/.devcontainer.profile/config.json`) in VS Code or your default editor.
+*   `show-profile-logs`: Opens the profile logs.
 *   `apply-profile`: Applies the current configuration. Installs tools, links dotfiles, and updates settings.
 *   `apply-profile --force`: Forces the application, breaking any stale locks.
 
